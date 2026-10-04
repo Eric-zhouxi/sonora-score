@@ -1,0 +1,94 @@
+import { expect, test, type Page } from '@playwright/test'
+
+async function blank(page: Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: '＋ 新建作品', exact: true }).click()
+  await page.getByRole('spinbutton', { name: '速度 BPM' }).fill('120')
+}
+async function readProject(page: Page) {
+  return page.evaluate(() => JSON.parse(localStorage.getItem('sonora.library.v1')!)[0])
+}
+async function pianoNotes(page: Page) {
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  await page.getByRole('button', { name: 'C4 1', exact: true }).click()
+  await page.getByRole('button', { name: 'E4 3', exact: true }).click()
+}
+
+test('dragging a split clip leaves the other clip in place and creates rests', async ({ page }) => {
+  await blank(page)
+  await pianoNotes(page)
+  await page.locator('.score-note').filter({ has: page.locator('text').filter({ hasText: 'E4' }) }).click()
+  await page.getByRole('button', { name: '在选中音符处分割' }).click()
+  await page.getByRole('button', { name: '时间轴', exact: true }).click()
+  const clip = page.locator('.music-clip').filter({ hasText: '片段 2' })
+  const box = (await clip.boundingBox())!
+  await page.mouse.move(box.x + 8, box.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 168, box.y + 12, { steps: 12 })
+  await page.mouse.up()
+  await expect(clip).toHaveAttribute('title', '片段 2 · 2.50 秒')
+  const project = await readProject(page)
+  expect(project.tracks[0].notes.map((note: { onsetBeats: number }) => note.onsetBeats)).toEqual([0, 5])
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  await expect(page.locator('.score-rest')).not.toHaveCount(0)
+  await page.screenshot({ path: 'test-results/drag-and-rests.png', fullPage: true })
+})
+
+test('the playhead drags, playback advances from that position and stop freezes it', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('.project-card').filter({ hasText: 'Sonora 示例：晨光' }).getByRole('button', { name: '打开作品 ↗' }).click()
+  const pointer = page.getByRole('slider', { name: '播放时间指针' })
+  const box = (await pointer.boundingBox())!
+  await page.mouse.move(box.x + 1, box.y + 7)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 81, box.y + 7, { steps: 8 })
+  await page.mouse.up()
+  await expect(page.getByRole('spinbutton', { name: '当前位置秒数' })).toHaveValue('1.01')
+  await page.getByRole('button', { name: '从当前位置播放' }).click()
+  await expect(page.getByRole('button', { name: '停止播放' })).toBeVisible()
+  await expect.poll(async () => Number(await pointer.getAttribute('aria-valuenow'))).toBeGreaterThan(1.3)
+  await page.getByRole('button', { name: '停止播放' }).click()
+  const stopped = await pointer.getAttribute('aria-valuenow')
+  await page.waitForTimeout(300)
+  expect(await pointer.getAttribute('aria-valuenow')).toBe(stopped)
+})
+
+test('two piano parts retain independent keys and meters in the generated SVG', async ({ page }) => {
+  await blank(page)
+  await pianoNotes(page)
+  await page.getByRole('combobox', { name: '声部拍号', exact: true }).selectOption('3/4')
+  await page.getByRole('combobox', { name: '移调目标调号' }).selectOption('D')
+  await page.getByRole('button', { name: '移调整个声部' }).click()
+  await page.getByRole('button', { name: '＋ 钢琴', exact: true }).click()
+  await page.getByRole('combobox', { name: '声部调号', exact: true }).selectOption('F')
+  await page.getByRole('combobox', { name: '声部拍号', exact: true }).selectOption('7/8')
+  await page.getByRole('button', { name: /^C4 / }).click()
+  const project = await readProject(page)
+  expect(project.tracks.map((track: { keySignature: string; timeSignature: string }) => [track.keySignature, track.timeSignature])).toEqual([['D', '3/4'], ['F', '7/8']])
+  expect(project.tracks[0].notes.map((note: { midi: number }) => note.midi)).toEqual([62, 66])
+  expect(project.tracks[1].notes[0].midi).toBe(60)
+  expect(project.tracks[0].color).not.toBe(project.tracks[1].color)
+  await page.getByRole('button', { name: '生成总谱', exact: true }).click()
+  await expect(page.locator('.part-setting')).toHaveText(['D 大调 · 3/4', 'F 大调 · 7/8'])
+  await expect(page.locator('.generated-score .score-rest')).not.toHaveCount(0)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载总谱 SVG' }).click()
+  expect((await download).suggestedFilename()).toContain('总谱.svg')
+  await page.screenshot({ path: 'test-results/mixed-meter-score.png', fullPage: true })
+  await page.getByRole('checkbox', { name: '钢琴 2加入总谱' }).uncheck()
+  await expect(page.locator('.part-setting')).toHaveText(['D 大调 · 3/4'])
+})
+
+test('clip offset, independent settings and multiple projects survive a reload', async ({ page }) => {
+  await blank(page)
+  await pianoNotes(page)
+  await page.getByRole('spinbutton', { name: '片段起始秒数' }).fill('3')
+  await page.getByRole('combobox', { name: '声部拍号', exact: true }).selectOption('5/4')
+  await page.getByRole('textbox', { name: '作品名称' }).fill('时间轴验收作品')
+  await page.reload()
+  await page.locator('.project-card').filter({ hasText: '时间轴验收作品' }).getByRole('button', { name: '打开作品 ↗' }).click()
+  await expect(page.locator('.music-clip')).toHaveAttribute('title', '片段 1 · 3.00 秒')
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: '声部拍号', exact: true })).toHaveValue('5/4')
+  await expect(page.locator('.score-rest')).not.toHaveCount(0)
+})

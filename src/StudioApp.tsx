@@ -1,104 +1,227 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { formatProjectDate, loadProjects, saveProjects } from './projectStore'
+import Timeline from './Timeline'
+import { GeneratedScore, Jianpu, ScoreSVG } from './Notation'
+import { clipRegions, keyInterval, moveClip, splitClip, transposeTrack } from './arrangement'
 import {
-  beatsPerMeasure, createBlankProject, defaultSpellingForKey, durationToBeats, isAccidental,
-  midiToJianpu, midiToName, midiToStaffY, newNote, newTrack, noteOnsets, pitches, trackDurationBeats,
+  beatsPerMeasure, beatsToSeconds, createBlankProject, defaultSpellingForKey, durationToBeats,
+  isAccidental, KEY_SIGNATURES, makeId, midiToJianpu, midiToName, newNote, newTrack, noteOnsets,
+  pitches, secondsToBeats, TIME_SIGNATURES, trackDurationBeats, trackKey, trackMeter,
   type AccidentalSpelling, type Duration, type InstrumentId, type KeySignature, type NoteEvent,
   type ProjectData, type TimeSignature, type Track,
 } from './workspace'
 
 const durations: { value: Duration; label: string; symbol: string }[] = [
-  { value: 2, label: '倍全音符', symbol: '𝅜' }, { value: 1, label: '全音符', symbol: '𝅝' },
-  { value: 0.5, label: '二分音符', symbol: '𝅗𝅥' }, { value: 0.25, label: '四分音符', symbol: '♩' },
-  { value: 0.125, label: '八分音符', symbol: '♪' },
+  { value: 1, label: '全音符', symbol: '𝅝' }, { value: 0.5, label: '二分音符', symbol: '𝅗𝅥' },
+  { value: 0.25, label: '四分音符', symbol: '♩' }, { value: 0.125, label: '八分音符', symbol: '♪' },
+  { value: 0.0625, label: '十六分音符', symbol: '♬' },
 ]
-const instrumentMeta: Record<InstrumentId, { name: string; icon: string }> = {
+const instruments: Record<InstrumentId, { name: string; icon: string }> = {
   piano: { name: '钢琴', icon: '♬' }, violin: { name: '小提琴', icon: '𝄞' },
   cello: { name: '大提琴', icon: '𝄢' }, flute: { name: '长笛', icon: '♩' },
 }
-
 function Home({ projects, onCreate, onOpen }: { projects: ProjectData[]; onCreate: () => void; onOpen: (id: string) => void }) {
   return <main className="home-shell">
-    <header className="home-topbar"><div className="brand-mark">S</div><div className="brand-copy"><strong>Sonora</strong><span>SCORE LIBRARY</span></div><button className="primary-action" onClick={onCreate}>＋ 新建作品</button></header>
-    <section className="home-hero"><p className="eyebrow">MY MUSIC / 本地作品库</p><h1>先选择作品，<br /><span>再进入你的音乐工作台。</span></h1><p>每个作品独立保存总谱、声部、速度、调号和拍号。</p></section>
-    <section className="project-library"><div className="library-heading"><h2>作品</h2><span>{projects.length} FILES</span></div><div className="project-grid">
+    <header className="home-topbar"><div className="brand-mark">S</div><div className="brand-copy"><strong>Sonora</strong><span>SCORE STUDIO</span></div><button className="primary-action" onClick={onCreate}>＋ 新建作品</button></header>
+    <section className="home-hero"><p className="eyebrow">YOUR MUSIC, YOUR TIME / 本地作品库</p><h1>让每一个声部，<br /><span>在自己的时间里发光。</span></h1><p>从空白开始，编排片段、书写声部，再把它们汇成一份总谱。</p></section>
+    <section className="project-library"><div className="library-heading"><h2>我的作品</h2><span>{projects.length} FILES</span></div><div className="project-grid">
       <button className="new-project-card" onClick={onCreate}><strong>＋</strong><span>创建空白作品</span><small>从一条空钢琴音轨开始</small></button>
       {projects.map((project) => <article className="project-card" key={project.id} onDoubleClick={() => onOpen(project.id)}>
-        <div className="score-preview" aria-hidden="true">{[0, 1, 2, 3, 4].map((line) => <i key={line} style={{ top: `${34 + line * 12}px` }} />)}{project.tracks.slice(0, 4).flatMap((track, trackIndex) => track.notes.slice(0, 4).map((note, noteIndex) => <b key={`${track.id}-${note.id}`} style={{ left: `${28 + noteIndex * 42 + trackIndex * 8}px`, top: `${48 - (note.midi - 60) * 2}px`, background: track.color }} />))}</div>
-        <div className="project-card-copy"><div>{project.example && <em>样例</em>}<strong>{project.title}</strong></div><p>{project.tracks.length} 个声部 · {project.keySignature} 大调 · {project.timeSignature}</p><small>更新于 {formatProjectDate(project.updatedAt)}</small></div>
-        <button onClick={() => onOpen(project.id)}>打开作品</button>
+        <div className="score-preview" aria-hidden="true">{[0, 1, 2, 3, 4].map((line) => <i key={line} style={{ top: 34 + line * 12 }} />)}{project.tracks.slice(0, 4).flatMap((track, t) => track.notes.slice(0, 4).map((note, n) => <b key={`${track.id}-${note.id}`} style={{ left: 28 + n * 42 + t * 8, top: 48 - (note.midi - 60) * 2, background: track.color }} />))}</div>
+        <div className="project-card-copy"><div>{project.example && <em>样例</em>}<strong>{project.title}</strong></div><p>{project.tracks.length} 个声部 · {project.bpm} BPM</p><small>更新于 {formatProjectDate(project.updatedAt)}</small></div><button onClick={() => onOpen(project.id)}>打开作品 ↗</button>
       </article>)}
     </div></section>
   </main>
 }
 
-function Staff({ project, track, selectedId, activeStep, onSelect }: { project: ProjectData; track: Track; selectedId: string | null; activeStep: number; onSelect: (id: string) => void }) {
-  const onsets = noteOnsets(track.notes), measureBeats = beatsPerMeasure(project.timeSignature)
-  const measures = Math.max(1, Math.ceil(Math.max(measureBeats, trackDurationBeats(track.notes)) / measureBeats))
-  const pxPerBeat = 62, startX = 156, width = Math.max(820, startX + measures * measureBeats * pxPerBeat + 42)
-  const [numerator, denominator] = project.timeSignature.split('/'), clef = track.instrument === 'cello' ? '𝄢' : '𝄞'
-  const fallbackSpelling = defaultSpellingForKey(project.keySignature)
-  return <div className="staff-scroll" aria-label={`${track.name}五线谱`}><svg className="staff" viewBox={`0 0 ${width} 170`} role="img">
-    {[68, 80, 92, 104, 116].map((y) => <line key={y} x1="28" x2={width - 24} y1={y} y2={y} className="staff-line" />)}
-    <text x="42" y="112" className={clef === '𝄢' ? 'clef bass' : 'clef'}>{clef}</text><text x="108" y="86" className="meter">{numerator}</text><text x="108" y="108" className="meter">{denominator}</text><text x="128" y="58" className="key-label">{project.keySignature}</text>
-    {Array.from({ length: measures + 1 }, (_, index) => { const x = startX + index * measureBeats * pxPerBeat; return <g key={index}><line x1={x} x2={x} y1="68" y2="116" className="bar-line" />{index < measures && <text x={x + 5} y="62" className="measure-number">{index + 1}</text>}</g> })}
-    {track.notes.map((note, index) => {
-      const spelling = note.spelling ?? fallbackSpelling, x = startX + 18 + onsets[index] * pxPerBeat
-      const y = midiToStaffY(note.midi, spelling, track.instrument === 'cello' ? 'bass' : 'treble')
-      const next = track.notes[index + 1], nextX = startX + 18 + (onsets[index + 1] ?? onsets[index] + durationToBeats(note.duration)) * pxPerBeat
-      return <g key={note.id} className={`note ${note.id === selectedId ? 'selected' : ''} ${index === activeStep ? 'active' : ''}`} onClick={() => onSelect(note.id)}>
-        {y >= 110 && <line x1={x - 13} x2={x + 14} y1="116" y2="116" className="ledger" />}{isAccidental(note.midi) && <text x={x - 24} y={y + 6} className="accidental">{spelling === 'flat' ? '♭' : '♯'}</text>}{note.fermata && <text x={x} y={y - 48} textAnchor="middle" className="fermata">𝄐</text>}
-        <ellipse cx={x} cy={y} rx="9" ry="6.5" transform={`rotate(-18 ${x} ${y})`} />{note.duration < 1 && <line x1={x + 8} x2={x + 8} y1={y} y2={y - 39} />}{note.duration === 0.125 && <path d={`M ${x + 8} ${y - 39} q 16 7 5 20`} className="note-flag" />}
-        {note.tieToNext && next?.midi === note.midi && <path d={`M ${x - 6} ${y + 11} Q ${(x + nextX) / 2} ${y + 28} ${nextX + 6} ${y + 11}`} className="tie" />}<text x={x} y="153" textAnchor="middle" className="pitch-label">{midiToName(note.midi, spelling)}</text>
-      </g>
-    })}
-  </svg></div>
-}
-
-function Jianpu({ project, track, selectedId, activeStep, onSelect }: { project: ProjectData; track: Track; selectedId: string | null; activeStep: number; onSelect: (id: string) => void }) {
-  const fallback = defaultSpellingForKey(project.keySignature)
-  return <div className="jianpu" aria-label={`${track.name}简谱`}>{track.notes.map((note, index) => { const { degree, octave } = midiToJianpu(note.midi, note.spelling ?? fallback); return <button key={note.id} onClick={() => onSelect(note.id)} className={`jianpu-note ${note.id === selectedId ? 'selected' : ''} ${index === activeStep ? 'active' : ''}`}>{note.fermata && <b>𝄐</b>}{octave > 0 && <i className="octave-dot top" />}<span>{degree}</span>{note.duration === 0.5 && <em>—</em>}{note.duration === 1 && <em>———</em>}{note.duration === 0.125 && <u />}{note.tieToNext && <small>⌒</small>}{octave < 0 && <i className="octave-dot bottom" />}</button> })}</div>
-}
-
-function Overview({ project, onOpenTrack }: { project: ProjectData; onOpenTrack: (id: string) => void }) {
-  const measureBeats = beatsPerMeasure(project.timeSignature), totalBeats = Math.max(measureBeats * 2, ...project.tracks.map((track) => trackDurationBeats(track.notes)))
-  const measureCount = Math.ceil(totalBeats / measureBeats)
-  return <section className="overview-panel"><div className="overview-heading"><div><span>总谱编排</span><h2>{project.title}</h2></div><p>双击任意声部进入精细编辑</p></div><div className="ruler"><span>小节</span>{Array.from({ length: measureCount }, (_, index) => <i key={index}>{index + 1}</i>)}</div><div className="arrangement" style={{ '--measures': measureCount } as CSSProperties}>
-    {project.tracks.map((track) => { const onsets = noteOnsets(track.notes); return <button key={track.id} className="arrangement-row" onDoubleClick={() => onOpenTrack(track.id)}><span className="arrangement-label"><i style={{ background: track.color }} />{track.name}<small>{track.muted ? '已静音' : instrumentMeta[track.instrument].name}</small></span><span className="arrangement-lane">{track.notes.map((note, index) => <b key={note.id} title={midiToName(note.midi, note.spelling)} style={{ left: `${onsets[index] / totalBeats * 100}%`, width: `${Math.max(1.4, durationToBeats(note.duration) / totalBeats * 100)}%`, background: track.color }} />)}</span></button> })}
-  </div></section>
-}
-
 export default function StudioApp() {
-  const [projects, setProjects] = useState<ProjectData[]>(() => loadProjects())
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null), [activeTrackId, setActiveTrackId] = useState<string | null>(null)
-  const [editorMode, setEditorMode] = useState<'overview' | 'track'>('overview'), [inputDuration, setInputDuration] = useState<Duration>(0.25)
-  const [inputOctave, setInputOctave] = useState(4), [inputSpelling, setInputSpelling] = useState<AccidentalSpelling>('sharp')
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null), [playing, setPlaying] = useState(false), [activeStep, setActiveStep] = useState(-1)
-  const [saveState, setSaveState] = useState('所有更改已保存'), playbackTimer = useRef<number | undefined>(undefined), midiInput = useRef<HTMLInputElement>(null)
-  const project = projects.find((item) => item.id === activeProjectId) ?? null, currentTrack = project?.tracks.find((track) => track.id === activeTrackId) ?? project?.tracks[0] ?? null
+  const [projects, setProjects] = useState<ProjectData[]>(loadProjects)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null)
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
+  const [mode, setMode] = useState<'timeline' | 'part' | 'score'>('timeline')
+  const [inputDuration, setInputDuration] = useState<Duration>(0.25)
+  const [inputOctave, setInputOctave] = useState(4)
+  const [inputSpelling, setInputSpelling] = useState<AccidentalSpelling>('sharp')
+  const [inputMode, setInputMode] = useState<'append' | 'cursor'>('append')
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
+  const [targetKey, setTargetKey] = useState<KeySignature>('C')
+  const [position, setPosition] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [loadingAudio, setLoadingAudio] = useState(false)
+  const [saveState, setSaveState] = useState('已保存到本机')
+  const raf = useRef<number | undefined>(undefined), generation = useRef(0), midiInput = useRef<HTMLInputElement>(null)
+  const project = projects.find((item) => item.id === activeProjectId) ?? null
+  const currentTrack = project?.tracks.find((track) => track.id === activeTrackId) ?? project?.tracks[0] ?? null
+  const selectedClip = currentTrack ? clipRegions(currentTrack).find((clip) => clip.id === selectedClipId) ?? clipRegions(currentTrack)[0] : null
+  const key = currentTrack && project ? trackKey(currentTrack, project) : 'C'
+  const meter = currentTrack && project ? trackMeter(currentTrack, project) : '4/4'
 
-  useEffect(() => { saveProjects(projects) }, [projects])
-  function updateProject(update: (project: ProjectData) => ProjectData) { if (!activeProjectId) return; setSaveState('正在保存…'); setProjects((current) => current.map((item) => item.id === activeProjectId ? { ...update(item), updatedAt: new Date().toISOString() } : item)); window.setTimeout(() => setSaveState('所有更改已保存'), 260) }
-  function openProject(id: string) { const target = projects.find((item) => item.id === id); if (!target) return; setActiveProjectId(id); setActiveTrackId(target.tracks[0]?.id ?? null); setEditorMode('overview'); setSelectedNoteId(null); setInputSpelling(defaultSpellingForKey(target.keySignature)) }
-  function createNewProject() { const created = createBlankProject(`未命名作品 ${projects.filter((item) => !item.example).length + 1}`); setProjects((current) => [created, ...current]); setActiveProjectId(created.id); setActiveTrackId(created.tracks[0].id); setEditorMode('overview') }
-  function updateTrack(id: string, update: (track: Track) => Track) { updateProject((current) => ({ ...current, tracks: current.tracks.map((track) => track.id === id ? update(track) : track) })) }
-  function addTrack(instrument: InstrumentId) { if (!project) return; const track = newTrack(instrument, project.tracks); updateProject((current) => ({ ...current, tracks: [...current.tracks, track] })); setActiveTrackId(track.id) }
-  function moveTrack(id: string, direction: -1 | 1) { updateProject((current) => { const tracks = [...current.tracks], index = tracks.findIndex((track) => track.id === id), destination = index + direction; if (index < 0 || destination < 0 || destination >= tracks.length) return current; const [track] = tracks.splice(index, 1); tracks.splice(destination, 0, track); return { ...current, tracks } }) }
-  function addNote(baseMidi: number) { if (!currentTrack) return; const midi = baseMidi + (inputOctave - 4) * 12, note = newNote(midi, inputDuration, isAccidental(midi) ? inputSpelling : undefined); updateTrack(currentTrack.id, (track) => ({ ...track, notes: [...track.notes, note] })); setSelectedNoteId(note.id); void import('./audio').then(({ previewNote }) => previewNote(currentTrack.instrument, midi)) }
-  function updateSelected(update: (note: NoteEvent) => NoteEvent) { if (!currentTrack || !selectedNoteId) return; updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.map((note) => note.id === selectedNoteId ? update(note) : note) })) }
-  function applyDuration(value: Duration) { setInputDuration(value); updateSelected((note) => ({ ...note, duration: value })) }
-  function applyAccidental(kind: 'sharp' | 'flat' | 'natural') { setInputSpelling(kind === 'flat' ? 'flat' : 'sharp'); updateSelected((note) => { if (kind === 'natural') return !isAccidental(note.midi) ? { ...note, spelling: undefined } : { ...note, midi: note.midi + (note.spelling === 'flat' ? 1 : -1), spelling: undefined }; if (isAccidental(note.midi)) return { ...note, spelling: kind }; return { ...note, midi: note.midi + (kind === 'sharp' ? 1 : -1), spelling: kind } }) }
-  function toggleTie() { if (!currentTrack || !selectedNoteId) return; updateTrack(currentTrack.id, (track) => { const notes = [...track.notes], index = notes.findIndex((note) => note.id === selectedNoteId); if (index < 0) return track; const enabled = !notes[index].tieToNext; notes[index] = { ...notes[index], tieToNext: enabled }; if (enabled && notes[index + 1]?.midi !== notes[index].midi) notes.splice(index + 1, 0, newNote(notes[index].midi, notes[index].duration, notes[index].spelling)); return { ...track, notes } }) }
-  function deleteSelected() { if (!currentTrack || !selectedNoteId) return; updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.filter((note) => note.id !== selectedNoteId) })); setSelectedNoteId(null) }
-  async function togglePlayback() { if (!project) return; if (playing) { const { stopPlayback } = await import('./audio'); stopPlayback(); if (playbackTimer.current) window.clearTimeout(playbackTimer.current); setPlaying(false); setActiveStep(-1); return } setPlaying(true); const { playTracks } = await import('./audio'); const length = await playTracks(project.tracks, project.bpm, setActiveStep); playbackTimer.current = window.setTimeout(() => { setPlaying(false); setActiveStep(-1) }, length) }
-  async function exportMidi() { if (!project) return; const { projectToMidi } = await import('./midi'), bytes = projectToMidi(project.tracks, project.bpm), url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'audio/midi' })), link = document.createElement('a'); link.href = url; link.download = `${project.title.replace(/[\\/:*?"<>|]/g, '-')}.mid`; link.click(); URL.revokeObjectURL(url) }
-  async function importMidi(file?: File) { if (!file) return; try { const { midiToProject } = await import('./midi'), imported = midiToProject(await file.arrayBuffer()); updateProject((current) => ({ ...current, bpm: imported.bpm, tracks: imported.tracks })); setActiveTrackId(imported.tracks[0].id); setEditorMode('overview') } catch { setSaveState('MIDI 导入失败') } }
+  useEffect(() => { try { saveProjects(projects) } catch { setSaveState('保存失败：本地空间不足，请导出 MIDI') } }, [projects])
+  useEffect(() => { setInputSpelling(defaultSpellingForKey(key)); setTargetKey(key) }, [activeTrackId, key])
+  useEffect(() => () => { generation.current++; if (raf.current) cancelAnimationFrame(raf.current); void import('./audio').then(({ stopPlayback }) => stopPlayback()) }, [])
+  function updateProject(update: (project: ProjectData) => ProjectData) {
+    if (!activeProjectId) return
+    setProjects((current) => current.map((item) => item.id === activeProjectId ? { ...update(item), updatedAt: new Date().toISOString() } : item))
+    setSaveState('已保存到本机')
+  }
+  function updateTrack(id: string, update: (track: Track) => Track) {
+    updateProject((current) => ({ ...current, tracks: current.tracks.map((track) => track.id === id ? update(track) : track) }))
+  }
+  function stop() {
+    generation.current++
+    if (raf.current) cancelAnimationFrame(raf.current)
+    setPlaying(false); setLoadingAudio(false)
+    void import('./audio').then(({ stopPlayback }) => stopPlayback())
+  }
+  function seek(seconds: number) { stop(); setPosition(Math.max(0, seconds)) }
+  function openProject(id: string) {
+    stop()
+    const target = projects.find((item) => item.id === id)
+    if (!target) return
+    setActiveProjectId(id); setActiveTrackId(target.tracks[0]?.id ?? null)
+    setSelectedClipId(target.tracks[0]?.clips?.[0]?.id ?? null); setSelectedTrackIds(target.tracks.map((track) => track.id))
+    setMode('timeline'); setSelectedNoteId(null); setPosition(0)
+  }
+  function createNewProject() {
+    stop()
+    const created = createBlankProject(`未命名作品 ${projects.filter((item) => !item.example).length + 1}`)
+    setProjects((current) => [created, ...current]); setActiveProjectId(created.id); setActiveTrackId(created.tracks[0].id)
+    setSelectedClipId(created.tracks[0].clips![0].id); setSelectedTrackIds([created.tracks[0].id]); setMode('timeline'); setPosition(0); setSelectedNoteId(null)
+  }
+  function openTrack(id: string, clipId?: string) {
+    setActiveTrackId(id)
+    setSelectedNoteId(null)
+    if (clipId) setSelectedClipId(clipId)
+    else setSelectedClipId(project?.tracks.find((track) => track.id === id)?.clips?.[0]?.id ?? null)
+    setMode('part')
+  }
+  function addTrack(instrument: InstrumentId) {
+    if (!project) return
+    const track = { ...newTrack(instrument, project.tracks), keySignature: project.keySignature, timeSignature: project.timeSignature }
+    updateProject((current) => ({ ...current, tracks: [...current.tracks, track] }))
+    setActiveTrackId(track.id); setSelectedClipId(track.clips![0].id); setSelectedTrackIds((ids) => [...ids, track.id]); setSelectedNoteId(null)
+  }
+  function reorderTrack(id: string, direction: -1 | 1) {
+    updateProject((current) => {
+      const tracks = [...current.tracks], index = tracks.findIndex((track) => track.id === id), destination = index + direction
+      if (index < 0 || destination < 0 || destination >= tracks.length) return current
+      const [track] = tracks.splice(index, 1); tracks.splice(destination, 0, track)
+      return { ...current, tracks }
+    })
+  }
+  function createClip() {
+    if (!currentTrack || !project) return
+    const clip = { id: makeId('clip'), name: `片段 ${clipRegions(currentTrack).length + 1}`, startBeats: secondsToBeats(position, project.bpm) }
+    updateTrack(currentTrack.id, (track) => ({ ...track, clips: [...track.clips ?? [], clip] }))
+    setSelectedClipId(clip.id); setSelectedNoteId(null); setMode('part')
+  }
+  function moveRegion(trackId: string, clipId: string, start: number) { stop(); updateTrack(trackId, (track) => moveClip(track, clipId, start)) }
+  function splitSelected() {
+    if (!currentTrack || !selectedNoteId) return
+    const result = splitClip(currentTrack, selectedNoteId)
+    if (result) { updateTrack(currentTrack.id, () => result.track); setSelectedClipId(result.clipId) }
+  }
+  function addNote(baseMidi: number) {
+    if (!currentTrack || !selectedClip || !project) return
+    const midi = baseMidi + (inputOctave - 4) * 12
+    const start = inputMode === 'cursor' ? secondsToBeats(position, project.bpm) : selectedClip.endBeats
+    const note = { ...newNote(midi, inputDuration, isAccidental(midi) ? inputSpelling : undefined), onsetBeats: Math.max(selectedClip.startBeats, start), clipId: selectedClip.id }
+    updateTrack(currentTrack.id, (track) => ({ ...track, notes: [...track.notes, note].sort((a, b) => (a.onsetBeats ?? 0) - (b.onsetBeats ?? 0)) }))
+    setSelectedNoteId(note.id)
+    if (inputMode === 'cursor') setPosition(beatsToSeconds(note.onsetBeats + durationToBeats(note.duration), project.bpm))
+    void import('./audio').then(({ previewNote }) => previewNote(currentTrack.instrument, midi)).catch(() => setSaveState('浏览器音频暂不可用'))
+  }
+  function selectNote(id: string) {
+    setSelectedNoteId(id)
+    const note = currentTrack?.notes.find((item) => item.id === id)
+    if (note?.clipId) setSelectedClipId(note.clipId)
+  }
+  function updateSelected(update: (note: NoteEvent) => NoteEvent) {
+    if (!currentTrack || !selectedNoteId) return
+    updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.map((note) => note.id === selectedNoteId ? update(note) : note) }))
+  }
+  function applyDuration(duration: Duration) { setInputDuration(duration); updateSelected((note) => ({ ...note, duration })) }
+  function applyAccidental(kind: 'sharp' | 'flat' | 'natural') {
+    setInputSpelling(kind === 'flat' ? 'flat' : 'sharp')
+    updateSelected((note) => kind === 'natural'
+      ? { ...note, midi: isAccidental(note.midi) ? note.midi + (note.spelling === 'flat' ? 1 : -1) : note.midi, spelling: undefined }
+      : { ...note, midi: isAccidental(note.midi) ? note.midi : note.midi + (kind === 'sharp' ? 1 : -1), spelling: kind })
+  }
+  function tieSelected() {
+    if (!currentTrack || !selectedNoteId) return
+    updateTrack(currentTrack.id, (track) => {
+      const notes = [...track.notes], index = notes.findIndex((note) => note.id === selectedNoteId)
+      if (index < 0) return track
+      const note = notes[index], enabled = !note.tieToNext, nextStart = (note.onsetBeats ?? 0) + durationToBeats(note.duration)
+      notes[index] = { ...note, tieToNext: enabled }
+      if (enabled && !notes.some((next) => next.id !== note.id && next.midi === note.midi && Math.abs((next.onsetBeats ?? 0) - nextStart) < 0.0001)) notes.push({ ...newNote(note.midi, note.duration, note.spelling), onsetBeats: nextStart, clipId: note.clipId })
+      return { ...track, notes: notes.sort((a, b) => (a.onsetBeats ?? 0) - (b.onsetBeats ?? 0)) }
+    })
+  }
+  async function togglePlayback() {
+    if (!project) return
+    if (playing || loadingAudio) { stop(); return }
+    const token = ++generation.current, from = position
+    setLoadingAudio(true)
+    try {
+      const { playTracks, stopPlayback } = await import('./audio')
+      if (token !== generation.current) return
+      let anchor = 0
+      const length = await playTracks(project.tracks, project.bpm, () => {}, secondsToBeats(from, project.bpm), () => { anchor = performance.now() + 60; setPlaying(true); setLoadingAudio(false) })
+      if (token !== generation.current) { stopPlayback(); return }
+      if (!length) { setPlaying(false); setLoadingAudio(false); return }
+      const loop = () => {
+        if (token !== generation.current) return
+        const elapsed = Math.max(0, performance.now() - anchor)
+        setPosition(from + elapsed / 1000)
+        if (elapsed >= length) { stopPlayback(); setPlaying(false); return }
+        raf.current = requestAnimationFrame(loop)
+      }
+      raf.current = requestAnimationFrame(loop)
+    } catch { setPlaying(false); setLoadingAudio(false); setSaveState('播放失败，请检查浏览器音频权限') }
+  }
+  async function exportMidi() {
+    if (!project) return
+    const { projectToMidi } = await import('./midi'), tracks = mode === 'score' ? project.tracks.filter((track) => selectedTrackIds.includes(track.id)) : project.tracks
+    const bytes = projectToMidi(tracks, project.bpm), url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'audio/midi' })), link = document.createElement('a')
+    link.href = url; link.download = `${project.title.replace(/[\\/:*?"<>|]/g, '-')}.mid`; link.click(); URL.revokeObjectURL(url)
+  }
+  async function importMidi(file?: File) {
+    if (!file) return
+    stop()
+    try {
+      const { midiToProject } = await import('./midi'), imported = midiToProject(await file.arrayBuffer())
+      updateProject((current) => ({ ...current, bpm: imported.bpm, tracks: imported.tracks }))
+      setActiveTrackId(imported.tracks[0].id); setSelectedClipId(imported.tracks[0].clips![0].id); setSelectedTrackIds(imported.tracks.map((track) => track.id)); setMode('timeline'); setPosition(0)
+    } catch { setSaveState('MIDI 导入失败') }
+    if (midiInput.current) midiInput.current.value = ''
+  }
 
   if (!project) return <Home projects={projects} onCreate={createNewProject} onOpen={openProject} />
-  return <main className="app-shell"><header className="topbar"><button className="back-home" onClick={() => setActiveProjectId(null)}>← 作品库</button><div className="brand-mark">S</div><input className="project-title-input" aria-label="作品名称" value={project.title} onChange={(event) => updateProject((current) => ({ ...current, title: event.target.value }))} /><nav><button className={editorMode === 'overview' ? 'nav-item active' : 'nav-item'} onClick={() => setEditorMode('overview')}>总谱</button><button className={editorMode === 'track' ? 'nav-item active' : 'nav-item'} onClick={() => setEditorMode('track')}>声部编辑</button></nav><div className="status-pill"><i /> {saveState}</div></header>
-    <section className="workspace-header compact"><div className="project-settings"><label>调号<select aria-label="调号" value={project.keySignature} onChange={(event) => { const key = event.target.value as KeySignature; updateProject((current) => ({ ...current, keySignature: key })); setInputSpelling(defaultSpellingForKey(key)) }}>{(['C', 'G', 'D', 'F', 'B♭', 'E♭'] as KeySignature[]).map((key) => <option key={key}>{key}</option>)}</select></label><label>拍号<select aria-label="拍号" value={project.timeSignature} onChange={(event) => updateProject((current) => ({ ...current, timeSignature: event.target.value as TimeSignature }))}>{(['4/4', '3/4', '6/8'] as TimeSignature[]).map((value) => <option key={value}>{value}</option>)}</select></label></div><div className="transport"><div className="tempo"><span>速度</span><strong>{project.bpm}</strong><small>BPM</small><input aria-label="速度" type="range" min="40" max="200" value={project.bpm} onChange={(event) => updateProject((current) => ({ ...current, bpm: Number(event.target.value) }))} /></div><button className="play-button" onClick={() => void togglePlayback()}>{playing ? '■' : '▶'}</button></div></section>
-    <section className="studio-grid"><aside className="track-panel"><div className="panel-title"><span>声部</span><small>{project.tracks.length} TRACKS</small></div>{project.tracks.map((track, index) => <div key={track.id} className={`track-card ${track.id === currentTrack?.id ? 'selected' : ''}`} onClick={() => setActiveTrackId(track.id)} onDoubleClick={() => { setActiveTrackId(track.id); setEditorMode('track') }}><span className="instrument-icon" style={{ background: track.color }}>{instrumentMeta[track.instrument].icon}</span><span className="track-name"><input aria-label={`${track.name}名称`} value={track.name} onClick={(event) => event.stopPropagation()} onChange={(event) => updateTrack(track.id, (current) => ({ ...current, name: event.target.value }))} /><small>{track.notes.length} 个音符 · 双击编辑</small></span><span className="track-actions"><button title="上移声部" disabled={index === 0} onClick={(event) => { event.stopPropagation(); moveTrack(track.id, -1) }}>↑</button><button title="下移声部" disabled={index === project.tracks.length - 1} onClick={(event) => { event.stopPropagation(); moveTrack(track.id, 1) }}>↓</button><button title="静音" className={track.muted ? 'muted' : ''} onClick={(event) => { event.stopPropagation(); updateTrack(track.id, (current) => ({ ...current, muted: !current.muted })) }}>M</button></span></div>)}<div className="add-track-row" aria-label="添加声部">{(['piano', 'violin', 'cello', 'flute'] as InstrumentId[]).map((instrument) => <button key={instrument} className="add-track" onClick={() => addTrack(instrument)}>＋ {instrumentMeta[instrument].name}</button>)}</div><p className="track-help">用 ↑↓ 调整总谱顺序，双击进入声部。</p></aside>
-      {editorMode === 'overview' ? <Overview project={project} onOpenTrack={(id) => { setActiveTrackId(id); setEditorMode('track') }} /> : currentTrack && <section className="score-panel"><div className="score-toolbar"><div className="view-switch"><button onClick={() => setEditorMode('overview')}>总谱总览</button><button className="active">{currentTrack.name}</button></div><div className="notation-tools">{durations.map((item) => <button key={item.value} title={item.label} className={inputDuration === item.value ? 'active' : ''} onClick={() => applyDuration(item.value)}>{item.symbol}</button>)}<span /><button title="降号" className={inputSpelling === 'flat' ? 'active' : ''} onClick={() => applyAccidental('flat')}>♭</button><button title="还原号" onClick={() => applyAccidental('natural')}>♮</button><button title="升号" className={inputSpelling === 'sharp' ? 'active' : ''} onClick={() => applyAccidental('sharp')}>♯</button><button title="延音线" onClick={toggleTie}>⌒</button><button title="延音记号" onClick={() => updateSelected((note) => ({ ...note, fermata: !note.fermata }))}>𝄐</button><button title="降低半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.max(21, note.midi - 1) }))}>−½</button><button title="升高半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.min(108, note.midi + 1) }))}>＋½</button><button title="删除选中音符" onClick={deleteSelected}>⌫</button><input ref={midiInput} type="file" accept="audio/midi,.mid,.midi" hidden onChange={(event) => void importMidi(event.target.files?.[0])} /><button className="text-tool" onClick={() => midiInput.current?.click()}>导入 MIDI</button><button className="text-tool" onClick={() => void exportMidi()}>导出 MIDI</button></div></div><div className="score-heading"><div><span style={{ background: currentTrack.color }} /><strong>{currentTrack.name}</strong></div><p>{project.keySignature} 大调 · {project.timeSignature} · {selectedNoteId ? '已选中音符' : '点击谱面音符进行编辑'}</p></div><Staff project={project} track={currentTrack} selectedId={selectedNoteId} activeStep={activeStep} onSelect={setSelectedNoteId} /><div className="notation-divider"><span>同步简谱</span></div><Jianpu project={project} track={currentTrack} selectedId={selectedNoteId} activeStep={activeStep} onSelect={setSelectedNoteId} /><div className="keyboard-section"><div className="keyboard-copy"><strong>音符输入</strong><span>选择八度、时值和升降号，再点击琴键</span><label>八度<select aria-label="输入八度" value={inputOctave} onChange={(event) => setInputOctave(Number(event.target.value))}>{[2, 3, 4, 5, 6].map((octave) => <option key={octave}>{octave}</option>)}</select></label></div><div className="keyboard">{pitches.map((baseMidi) => { const midi = baseMidi + (inputOctave - 4) * 12, spelling = isAccidental(midi) ? inputSpelling : 'sharp'; return <button className={isAccidental(midi) ? 'accidental-key' : ''} key={baseMidi} onClick={() => addNote(baseMidi)}><span>{midiToName(midi, spelling)}</span><kbd>{midiToJianpu(midi, spelling).degree}</kbd></button> })}</div></div></section>}
-    </section><footer><span>SONORA SCORE · COMPOSER</span><span>作品库 ⇄ 总谱 ⇄ 声部 ⇄ MIDI</span></footer>
+  const partEnd = currentTrack ? Math.ceil(Math.max(beatsPerMeasure(meter), trackDurationBeats(currentTrack.notes)) / beatsPerMeasure(meter)) * beatsPerMeasure(meter) : 4
+  return <main className="app-shell">
+    <header className="topbar"><button className="back-home" onClick={() => { stop(); setActiveProjectId(null) }}>← 作品库</button><div className="brand-mark">S</div><input className="project-title-input" aria-label="作品名称" value={project.title} onChange={(event) => updateProject((current) => ({ ...current, title: event.target.value }))} /><nav>{([['timeline', '时间轴'], ['part', '声部编辑'], ['score', '生成总谱']] as const).map(([value, label]) => <button key={value} className={mode === value ? 'nav-item active' : 'nav-item'} onClick={() => setMode(value)}>{label}</button>)}</nav><div className="status-pill"><i />{saveState}</div></header>
+    <section className="workspace-header"><div className="project-settings"><span>新声部默认</span><label>调号<select aria-label="默认调号" value={project.keySignature} onChange={(event) => updateProject((current) => ({ ...current, keySignature: event.target.value as KeySignature }))}>{KEY_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><label>拍号<select aria-label="默认拍号" value={project.timeSignature} onChange={(event) => updateProject((current) => ({ ...current, timeSignature: event.target.value as TimeSignature }))}>{TIME_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label></div><div className="transport"><button aria-label="回到开头" onClick={() => seek(0)}>↤</button><output className="time-readout">{position.toFixed(2)}<small> SEC</small></output><label className="tempo">♩ <input aria-label="速度 BPM" type="number" min="20" max="300" value={project.bpm} onChange={(event) => { stop(); updateProject((current) => ({ ...current, bpm: Math.max(20, Math.min(300, Number(event.target.value) || 96)) })) }} /><small>BPM</small></label><button className="play-button" aria-label={playing || loadingAudio ? '停止播放' : '从当前位置播放'} onClick={() => void togglePlayback()}>{loadingAudio ? '…' : playing ? '■' : '▶'}</button></div></section>
+    <section className="studio-grid"><aside className="track-panel"><div className="panel-title"><span>声部</span><small>{project.tracks.length} TRACKS</small></div>
+      {project.tracks.map((track, index) => <div key={track.id} className={`track-card ${track.id === currentTrack?.id ? 'selected' : ''}`} style={{ '--track-color': track.color } as CSSProperties} onClick={() => { setActiveTrackId(track.id); setSelectedClipId(track.clips?.[0]?.id ?? null); setSelectedNoteId(null) }} onDoubleClick={() => openTrack(track.id)}><span className="instrument-icon" style={{ color: track.color }}>{instruments[track.instrument].icon}</span><span className="track-name"><input aria-label={`${track.name}名称`} value={track.name} onClick={(event) => event.stopPropagation()} onChange={(event) => updateTrack(track.id, (current) => ({ ...current, name: event.target.value }))} /><small>{trackKey(track, project)} · {trackMeter(track, project)} · {track.notes.length} 个音</small><label className="score-check" onClick={(event) => event.stopPropagation()}><input aria-label={`${track.name}加入总谱`} type="checkbox" checked={selectedTrackIds.includes(track.id)} onChange={(event) => setSelectedTrackIds((ids) => event.target.checked ? [...ids, track.id] : ids.filter((id) => id !== track.id))} />加入总谱</label></span><span className="track-actions"><button aria-label={`${track.name}上移`} title="上移声部" disabled={index === 0} onClick={(event) => { event.stopPropagation(); reorderTrack(track.id, -1) }}>↑</button><button aria-label={`${track.name}下移`} title="下移声部" disabled={index === project.tracks.length - 1} onClick={(event) => { event.stopPropagation(); reorderTrack(track.id, 1) }}>↓</button><button aria-label={`${track.name}静音`} title="静音" className={track.muted ? 'muted' : ''} onClick={(event) => { event.stopPropagation(); stop(); updateTrack(track.id, (current) => ({ ...current, muted: !current.muted })) }}>M</button></span></div>)}
+      <div className="add-track-row" aria-label="添加声部">{(['piano', 'violin', 'cello', 'flute'] as InstrumentId[]).map((instrument) => <button key={instrument} onClick={() => addTrack(instrument)}>＋ {instruments[instrument].name}</button>)}</div>
+      <button className="generate-button" onClick={() => setMode('score')} disabled={!selectedTrackIds.length}>生成总谱 <span>{selectedTrackIds.length} 声部 ↗</span></button>
+      <p className="track-help">勾选参与合谱的声部。每条音轨可独立设置调号、拍号和颜色。</p>
+      <div className="file-tools"><input ref={midiInput} type="file" accept=".mid,.midi" hidden onChange={(event) => void importMidi(event.target.files?.[0])} /><button onClick={() => midiInput.current?.click()}>导入 MIDI</button><button onClick={() => void exportMidi()}>导出 MIDI</button></div>
+    </aside><div className="main-workspace">
+      {(mode === 'timeline' || mode === 'part') && <Timeline project={project} position={position} selectedClipId={selectedClipId} onSeek={seek} onSelect={(trackId, clipId) => { setActiveTrackId(trackId); setSelectedClipId(clipId); setSelectedNoteId(null) }} onMoveClip={moveRegion} onOpenTrack={(id) => openTrack(id, selectedClipId ?? undefined)} />}
+      {currentTrack && mode !== 'score' && <section className="clip-inspector"><label>当前片段<select aria-label="当前片段" value={selectedClip?.id ?? ''} onChange={(event) => { setSelectedClipId(event.target.value); setSelectedNoteId(null) }}>{clipRegions(currentTrack).map((clip) => <option value={clip.id} key={clip.id}>{clip.name}</option>)}</select></label>{selectedClip && <><label>名称<input aria-label="片段名称" value={selectedClip.name} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, clips: track.clips?.map((clip) => clip.id === selectedClip.id ? { ...clip, name: event.target.value } : clip) }))} /></label><label>起始秒<input aria-label="片段起始秒数" type="number" min="0" step="0.1" value={Number(beatsToSeconds(selectedClip.startBeats, project.bpm).toFixed(3))} onChange={(event) => moveRegion(currentTrack.id, selectedClip.id, secondsToBeats(Math.max(0, Number(event.target.value)), project.bpm))} /></label></>}<button onClick={createClip}>＋ 在当前位置新建片段</button><button onClick={splitSelected} disabled={!selectedNoteId}>在选中音符处分割</button></section>}
+      {mode === 'part' && currentTrack && <section className="part-panel"><div className="section-heading"><div><span className="eyebrow">PART / 声部编辑</span><h2 style={{ color: currentTrack.color }}>{currentTrack.name}</h2></div><label className="color-picker">轨道颜色<input type="color" aria-label="轨道颜色" value={currentTrack.color} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, color: event.target.value }))} /></label></div>
+        <div className="part-settings"><label>声部调号<select aria-label="声部调号" value={key} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, keySignature: event.target.value as KeySignature }))}>{KEY_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><label>声部拍号<select aria-label="声部拍号" value={meter} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, timeSignature: event.target.value as TimeSignature }))}>{TIME_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><span className="settings-divider" /><label>移调到<select aria-label="移调目标调号" value={targetKey} onChange={(event) => setTargetKey(event.target.value as KeySignature)}>{KEY_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><button onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, keyInterval(key, targetKey), targetKey)) }}>移调整个声部</button><button aria-label="声部降半音" onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, -1)) }}>− 半音</button><button aria-label="声部升半音" onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, 1)) }}>＋ 半音</button></div>
+        <p className="helper">设置调号只改变记谱；“移调整个声部”同时改变音高。当前声部拍号不影响其他音轨。</p>
+        <div className="notation-tools">{durations.map((item) => <button key={item.value} title={item.label} aria-label={item.label} className={inputDuration === item.value ? 'active' : ''} onClick={() => applyDuration(item.value)}>{item.symbol}</button>)}<span /><button title="降号" onClick={() => applyAccidental('flat')} className={inputSpelling === 'flat' ? 'active' : ''}>♭</button><button title="还原号" onClick={() => applyAccidental('natural')}>♮</button><button title="升号" onClick={() => applyAccidental('sharp')} className={inputSpelling === 'sharp' ? 'active' : ''}>♯</button><button title="延音线" onClick={tieSelected}>⌒</button><button title="延音记号" onClick={() => updateSelected((note) => ({ ...note, fermata: !note.fermata }))}>𝄐</button><button title="音符降低半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.max(0, note.midi - 1), spelling: 'flat' }))}>−½</button><button title="音符升高半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.min(127, note.midi + 1), spelling: 'sharp' }))}>＋½</button><button title="删除选中音符，保留时间空档" disabled={!selectedNoteId} onClick={() => { updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.filter((note) => note.id !== selectedNoteId) })); setSelectedNoteId(null) }}>⌫</button><button onClick={() => setSelectedNoteId(null)} className="text-tool">取消选择 / 继续输入</button></div>
+        <div className="notation-scroll"><ScoreSVG project={project} tracks={[currentTrack]} selectedId={selectedNoteId} positionBeats={playing ? secondsToBeats(position, project.bpm) : undefined} onSelect={selectNote} endBeats={partEnd} /></div>
+        <Jianpu project={project} track={currentTrack} selectedId={selectedNoteId} endBeats={partEnd} onSelect={selectNote} />
+        <div className="keyboard-section"><div className="keyboard-copy"><strong>音符输入</strong><span>{selectedClip?.name} · {inputSpelling === 'flat' ? '降号记法' : '升号记法'}</span><label>位置<select aria-label="音符输入位置" value={inputMode} onChange={(event) => setInputMode(event.target.value as 'append' | 'cursor')}><option value="append">当前片段末尾</option><option value="cursor">播放指针位置</option></select></label><label>八度<select aria-label="输入八度" value={inputOctave} onChange={(event) => setInputOctave(Number(event.target.value))}>{[2, 3, 4, 5, 6].map((octave) => <option key={octave}>{octave}</option>)}</select></label></div><div className="keyboard">{pitches.map((baseMidi) => { const midi = baseMidi + (inputOctave - 4) * 12; return <button className={isAccidental(midi) ? 'accidental-key' : ''} key={baseMidi} onClick={() => addNote(baseMidi)}><span>{midiToName(midi, inputSpelling)}</span><kbd>{midiToJianpu(midi, inputSpelling, key).degree}</kbd></button> })}</div></div>
+      </section>}
+      {mode === 'score' && <GeneratedScore project={project} selectedIds={selectedTrackIds} />}
+    </div></section><footer><span>SONORA · SCORE STUDIO</span><span>时间轴 / 独立声部 / 总谱</span></footer>
   </main>
 }

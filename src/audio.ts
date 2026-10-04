@@ -1,6 +1,7 @@
 import * as Tone from 'tone'
-import type { InstrumentId, NoteEvent, Track } from './workspace'
-import { durationToBeats, midiToName, noteOnsets, trackDurationBeats } from './workspace'
+import type { InstrumentId, Track } from './workspace'
+import { midiToName } from './workspace'
+import { playbackEvents } from './playback'
 
 type Voice = Tone.PolySynth | Tone.Sampler
 let instruments: Record<InstrumentId, Voice> | undefined
@@ -64,51 +65,46 @@ export async function previewNote(instrument: InstrumentId, midi: number) {
   voices[instrument].triggerAttackRelease(midiToName(midi), '8n')
 }
 
-export async function playTracks(tracks: Track[], bpm: number, onStep: (index: number) => void) {
+let scheduleIds: number[] = []
+let playbackGeneration = 0
+
+export async function playTracks(
+  tracks: Track[],
+  bpm: number,
+  onStep: (index: number) => void = () => {},
+  fromBeats = 0,
+  onStart?: () => void,
+) {
+  stopPlayback()
+  const generation = playbackGeneration
   await Tone.start()
-  const synths = await getInstruments()
+  const voices = await getInstruments()
+  if (generation !== playbackGeneration) return 0
+  const events = playbackEvents(tracks, fromBeats)
   const secondsPerBeat = 60 / bpm
-  const startAt = Tone.now() + 0.08
-  let longest = 0
-
-  tracks.filter((track) => !track.muted).forEach((track) => {
-    const onsets = noteOnsets(track.notes)
-    track.notes.forEach((note, index) => {
-      const previous = track.notes[index - 1]
-      const continuesTie = previous?.tieToNext
-        && previous.midi === note.midi
-        && Math.abs(onsets[index] - (onsets[index - 1] + durationToBeats(previous.duration))) < 0.001
-      if (continuesTie) return
-
-      let durationBeats = durationToBeats(note.duration)
-      let tiedIndex = index
-      while (track.notes[tiedIndex]?.tieToNext) {
-        const next = track.notes[tiedIndex + 1]
-        if (!next || next.midi !== note.midi) break
-        const expectedOnset = onsets[tiedIndex] + durationToBeats(track.notes[tiedIndex].duration)
-        if (Math.abs(onsets[tiedIndex + 1] - expectedOnset) >= 0.001) break
-        durationBeats += durationToBeats(next.duration)
-        tiedIndex += 1
-      }
-      if (track.notes[tiedIndex]?.fermata || note.fermata) durationBeats *= 1.5
-
-      const duration = durationBeats * secondsPerBeat
-      const onset = onsets[index] * secondsPerBeat
-      synths[track.instrument].triggerAttackRelease(
-        midiToName(note.midi, note.spelling),
-        duration * 0.92,
-        startAt + onset,
-        note.velocity,
-      )
-      window.setTimeout(() => onStep(index), (onset + 0.08) * 1000)
-    })
-    longest = Math.max(longest, trackDurationBeats(track.notes) * secondsPerBeat)
-  })
-
-  return longest * 1000 + 250
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.seconds = 0
+  let endSeconds = 0
+  for (const [index, event] of events.entries()) {
+    const onset = event.startBeats * secondsPerBeat
+    const duration = event.durationBeats * secondsPerBeat
+    endSeconds = Math.max(endSeconds, onset + duration)
+    scheduleIds.push(transport.scheduleOnce((time) => {
+      voices[event.instrument].triggerAttackRelease(midiToName(event.midi), duration * 0.98, time, event.velocity)
+      Tone.getDraw().schedule(() => onStep(index), time)
+    }, onset))
+  }
+  transport.start('+0.06')
+  onStart?.()
+  return Math.max(endSeconds, 0.01) * 1000 + 60
 }
 
 export function stopPlayback() {
-  if (!instruments) return
-  Object.values(instruments).forEach((instrument) => instrument.releaseAll())
+  playbackGeneration++
+  const transport = Tone.getTransport()
+  transport.stop()
+  scheduleIds.forEach((id) => transport.clear(id))
+  scheduleIds = []
+  if (instruments) Object.values(instruments).forEach((instrument) => instrument.releaseAll())
 }

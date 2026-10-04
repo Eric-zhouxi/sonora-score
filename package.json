@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "check": "tsc -b"
+    "check": "tsc -b",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@spotify/basic-pitch": "^1.0.1",
@@ -17,6 +18,7 @@
     "tone": "15.1.22"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.1",

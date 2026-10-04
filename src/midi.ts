@@ -1,7 +1,7 @@
 import { Midi } from '@tonejs/midi'
-import { durationToBeats, newNote, noteOnsets, type Duration, type InstrumentId, type Track } from './workspace'
+import { durationToBeats, newNote, newTrack, normalizeTrack, noteOnsets, TRACK_COLORS, type Duration, type InstrumentId, type Track } from './workspace'
 
-const supportedDurations: Duration[] = [0.125, 0.25, 0.5, 1, 2]
+const supportedDurations: Duration[] = [0.0625, 0.125, 0.25, 0.5, 1, 2]
 const midiPrograms: Record<InstrumentId, number> = { piano: 0, violin: 40, cello: 42, flute: 73 }
 
 function closestDuration(beats: number): Duration {
@@ -29,16 +29,14 @@ export function projectToMidi(tracks: Track[], bpm: number): Uint8Array {
 export function midiToProject(bytes: ArrayBuffer): { bpm: number; tracks: Track[] } {
   const midi = new Midi(bytes)
   const bpm = Math.round(midi.header.tempos[0]?.bpm ?? 96)
-  const colors = ['#d8aa59', '#d47f67']
-  const imported = midi.tracks.filter((track) => track.notes.length > 0).slice(0, 2)
+  const imported = midi.tracks.filter((track) => track.notes.length > 0)
   const tracks = imported.map((track, index): Track => {
     const program = track.instrument.number
     const instrument: InstrumentId = program === 42 ? 'cello' : program === 73 ? 'flute' : program >= 40 && program <= 47 ? 'violin' : 'piano'
-    return {
-      id: `imported-${index + 1}`,
-      instrument,
+    return normalizeTrack({
+      ...newTrack(instrument),
+      color: TRACK_COLORS[index % TRACK_COLORS.length],
       name: track.name || `导入${instrument === 'piano' ? '钢琴' : instrument === 'violin' ? '小提琴' : instrument === 'cello' ? '大提琴' : '长笛'}`,
-      color: colors[index],
       muted: false,
       notes: [...track.notes]
         .sort((a, b) => a.ticks - b.ticks)
@@ -47,10 +45,9 @@ export function midiToProject(bytes: ArrayBuffer): { bpm: number; tracks: Track[
           velocity: note.velocity,
           onsetBeats: note.ticks / midi.header.ppq,
         })),
-    }
+    }, index)
   })
 
   if (tracks.length === 0) throw new Error('MIDI 文件中没有音符')
-  if (tracks.length === 1) tracks.push({ id: 'violin-1', instrument: 'violin', name: '独奏小提琴', color: colors[1], muted: false, notes: [] })
   return { bpm, tracks }
 }

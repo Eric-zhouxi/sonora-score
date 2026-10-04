@@ -11,3 +11,5 @@ __pycache__/
 .DS_Store
 transcription/output/
 assets/samples/cache/
+test-results/
+playwright-report/
