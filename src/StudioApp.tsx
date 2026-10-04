@@ -6,7 +6,7 @@ import { clipRegions, keyInterval, moveClip, splitClip, transposeTrack } from '.
 import {
   beatsPerMeasure, beatsToSeconds, createBlankProject, defaultSpellingForKey, durationToBeats,
   isAccidental, KEY_SIGNATURES, makeId, midiToJianpu, midiToName, newNote, newTrack, noteOnsets,
-  pitches, secondsToBeats, TIME_SIGNATURES, trackDurationBeats, trackKey, trackMeter,
+  secondsToBeats, TIME_SIGNATURES, trackDurationBeats, trackKey, trackMeter,
   type AccidentalSpelling, type Duration, type InstrumentId, type KeySignature, type NoteEvent,
   type ProjectData, type TimeSignature, type Track,
 } from './workspace'
@@ -41,7 +41,7 @@ export default function StudioApp() {
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
   const [mode, setMode] = useState<'timeline' | 'part' | 'score'>('timeline')
   const [inputDuration, setInputDuration] = useState<Duration>(0.25)
-  const [inputOctave, setInputOctave] = useState(4)
+  const [expandedKeyboard, setExpandedKeyboard] = useState(false)
   const [inputSpelling, setInputSpelling] = useState<AccidentalSpelling>('sharp')
   const [inputMode, setInputMode] = useState<'append' | 'cursor'>('append')
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
@@ -123,9 +123,8 @@ export default function StudioApp() {
     const result = splitClip(currentTrack, selectedNoteId)
     if (result) { updateTrack(currentTrack.id, () => result.track); setSelectedClipId(result.clipId) }
   }
-  function addNote(baseMidi: number) {
+  function addNote(midi: number) {
     if (!currentTrack || !selectedClip || !project) return
-    const midi = baseMidi + (inputOctave - 4) * 12
     const start = inputMode === 'cursor' ? secondsToBeats(position, project.bpm) : selectedClip.endBeats
     const note = { ...newNote(midi, inputDuration, isAccidental(midi) ? inputSpelling : undefined), onsetBeats: Math.max(selectedClip.startBeats, start), clipId: selectedClip.id }
     updateTrack(currentTrack.id, (track) => ({ ...track, notes: [...track.notes, note].sort((a, b) => (a.onsetBeats ?? 0) - (b.onsetBeats ?? 0)) }))
@@ -219,7 +218,22 @@ export default function StudioApp() {
         <div className="notation-tools">{durations.map((item) => <button key={item.value} title={item.label} aria-label={item.label} className={inputDuration === item.value ? 'active' : ''} onClick={() => applyDuration(item.value)}>{item.symbol}</button>)}<span /><button title="降号" onClick={() => applyAccidental('flat')} className={inputSpelling === 'flat' ? 'active' : ''}>♭</button><button title="还原号" onClick={() => applyAccidental('natural')}>♮</button><button title="升号" onClick={() => applyAccidental('sharp')} className={inputSpelling === 'sharp' ? 'active' : ''}>♯</button><button title="延音线" onClick={tieSelected}>⌒</button><button title="延音记号" onClick={() => updateSelected((note) => ({ ...note, fermata: !note.fermata }))}>𝄐</button><button title="音符降低半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.max(0, note.midi - 1), spelling: 'flat' }))}>−½</button><button title="音符升高半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.min(127, note.midi + 1), spelling: 'sharp' }))}>＋½</button><button title="删除选中音符，保留时间空档" disabled={!selectedNoteId} onClick={() => { updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.filter((note) => note.id !== selectedNoteId) })); setSelectedNoteId(null) }}>⌫</button><button onClick={() => setSelectedNoteId(null)} className="text-tool">取消选择 / 继续输入</button></div>
         <div className="notation-scroll"><ScoreSVG project={project} tracks={[currentTrack]} selectedId={selectedNoteId} positionBeats={playing ? secondsToBeats(position, project.bpm) : undefined} onSelect={selectNote} endBeats={partEnd} /></div>
         <Jianpu project={project} track={currentTrack} selectedId={selectedNoteId} endBeats={partEnd} onSelect={selectNote} />
-        <div className="keyboard-section"><div className="keyboard-copy"><strong>音符输入</strong><span>{selectedClip?.name} · {inputSpelling === 'flat' ? '降号记法' : '升号记法'}</span><label>位置<select aria-label="音符输入位置" value={inputMode} onChange={(event) => setInputMode(event.target.value as 'append' | 'cursor')}><option value="append">当前片段末尾</option><option value="cursor">播放指针位置</option></select></label><label>八度<select aria-label="输入八度" value={inputOctave} onChange={(event) => setInputOctave(Number(event.target.value))}>{[2, 3, 4, 5, 6].map((octave) => <option key={octave}>{octave}</option>)}</select></label></div><div className="keyboard">{pitches.map((baseMidi) => { const midi = baseMidi + (inputOctave - 4) * 12; return <button className={isAccidental(midi) ? 'accidental-key' : ''} key={baseMidi} onClick={() => addNote(baseMidi)}><span>{midiToName(midi, inputSpelling)}</span><kbd>{midiToJianpu(midi, inputSpelling, key).degree}</kbd></button> })}</div></div>
+        <div className="keyboard-section">
+          <div className="keyboard-copy">
+            <strong>音符输入</strong><span>{selectedClip?.name} · {inputSpelling === 'flat' ? '降号记法' : '升号记法'} · {expandedKeyboard ? 'C2–C7 / 61 键' : 'C3–C6 / 37 键'}</span>
+            <label>位置<select aria-label="音符输入位置" value={inputMode} onChange={(event) => setInputMode(event.target.value as 'append' | 'cursor')}><option value="append">当前片段末尾</option><option value="cursor">播放指针位置</option></select></label>
+            <label><input type="checkbox" checked={expandedKeyboard} onChange={(event) => setExpandedKeyboard(event.target.checked)} />扩展至 C2–C7</label>
+          </div>
+          <div className="keyboard-scroll" role="region" aria-label="多八度音符键盘" tabIndex={0}>
+            <div className="keyboard">{Array.from({ length: expandedKeyboard ? 61 : 37 }, (_, index) => (expandedKeyboard ? 36 : 48) + index).map((midi) => {
+              const name = midiToName(midi, inputSpelling), degree = midiToJianpu(midi, inputSpelling, key).degree
+              return <button className={isAccidental(midi) ? 'accidental-key' : midi % 12 === 0 ? 'octave-key' : ''} key={midi} aria-label={`${name} ${degree}`} title={midi === 60 ? 'C4 · 中央 C' : name} onClick={() => addNote(midi)}>
+                {midi === 60 && <small className="middle-c">中央 C</small>}<span>{name}</span><kbd>{degree}</kbd>
+              </button>
+            })}</div>
+          </div>
+          <p className="keyboard-hint">直接点击不同八度的琴键输入 · 超出屏幕时可横向滚动</p>
+        </div>
       </section>}
       {mode === 'score' && <GeneratedScore project={project} selectedIds={selectedTrackIds} />}
     </div></section><footer><span>SONORA · SCORE STUDIO</span><span>时间轴 / 独立声部 / 总谱</span></footer>

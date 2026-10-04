@@ -14,6 +14,82 @@ async function pianoNotes(page: Page) {
   await page.getByRole('button', { name: 'E4 3', exact: true }).click()
 }
 
+test('the continuous keyboard enters absolute pitches across octaves and scrolls on narrow screens', async ({ page }) => {
+  await blank(page)
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  const keyboard = page.getByRole('region', { name: '多八度音符键盘' })
+  await expect(keyboard.getByRole('button')).toHaveCount(37)
+  for (const name of ['C3 1', 'C4 1', 'C5 1', 'C6 1', 'C♯4 ♯1']) {
+    await keyboard.getByRole('button', { name, exact: true }).click()
+  }
+  expect((await readProject(page)).tracks[0].notes.map((note: { midi: number }) => note.midi)).toEqual([48, 60, 72, 84, 61])
+  await page.screenshot({ path: 'test-results/multi-octave-keyboard.png', fullPage: true })
+  await page.getByRole('checkbox', { name: '扩展至 C2–C7' }).check()
+  await expect(keyboard.getByRole('button')).toHaveCount(61)
+  for (const name of ['C2 1', 'C7 1']) await keyboard.getByRole('button', { name, exact: true }).click()
+  expect((await readProject(page)).tracks[0].notes.slice(-2).map((note: { midi: number }) => note.midi)).toEqual([36, 96])
+  await page.setViewportSize({ width: 390, height: 844 })
+  await keyboard.getByRole('button', { name: 'C4 1', exact: true }).click()
+  expect((await readProject(page)).tracks[0].notes.at(-1).midi).toBe(60)
+  expect(await keyboard.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  const bounds = (await keyboard.boundingBox())!
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390)
+})
+
+test('clip edges align across tracks with guides and allow mouse and keyboard fine adjustment', async ({ page }) => {
+  await blank(page)
+  await pianoNotes(page)
+  await page.getByRole('spinbutton', { name: '片段起始秒数' }).fill('2')
+  await page.getByRole('button', { name: '＋ 钢琴', exact: true }).click()
+  for (const name of ['C4 1', 'E4 3']) await page.getByRole('button', { name, exact: true }).click()
+  await page.getByRole('button', { name: '时间轴', exact: true }).click()
+  const clip = page.locator('.timeline-track').filter({ hasText: '钢琴 2' }).locator('.music-clip')
+  const guide = page.locator('.alignment-guide')
+  async function dragBy(pixels: number) {
+    const box = (await clip.boundingBox())!
+    await page.mouse.move(box.x + 15, box.y + 25)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 15 + pixels, box.y + 25, { steps: 8 })
+  }
+  await dragBy(155)
+  await expect(clip).toHaveAttribute('title', '片段 1 · 2.00 秒')
+  await expect(guide).toHaveCount(2)
+  await expect(guide.first()).toHaveAttribute('data-seconds', '2')
+  await page.screenshot({ path: 'test-results/alignment-guides.png', fullPage: true })
+  await page.mouse.up()
+  await expect(guide).toHaveCount(0)
+  await clip.press('ArrowLeft')
+  await expect(clip).toHaveAttribute('title', '片段 1 · 1.99 秒')
+  await clip.press('Shift+ArrowRight')
+  await expect(clip).toHaveAttribute('title', '片段 1 · 2.09 秒')
+  await page.keyboard.down('Alt')
+  await dragBy(-4)
+  await expect(guide).toHaveCount(0)
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  await expect(clip).toHaveAttribute('title', '片段 1 · 2.04 秒')
+  // The moving clip's end can align to the other clip's start.
+  await dragBy(-78)
+  await expect(clip).toHaveAttribute('title', '片段 1 · 1.00 秒')
+  await expect(guide).toHaveCount(1)
+  await expect(guide).toHaveAttribute('data-seconds', '2')
+  await page.mouse.up()
+  // Escape cancels the preview without altering stored notes.
+  await dragBy(80)
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  await expect(clip).toHaveAttribute('title', '片段 1 · 1.00 秒')
+  const project = await readProject(page)
+  expect(project.tracks[0].notes.map((note: { onsetBeats: number }) => note.onsetBeats)).toEqual([4, 5])
+  expect(project.tracks[1].notes.map((note: { onsetBeats: number }) => note.onsetBeats)).toEqual([2, 3])
+  await page.getByRole('checkbox', { name: '自动对齐' }).uncheck()
+  await page.getByRole('combobox', { name: '时间轴吸附' }).selectOption('0')
+  await dragBy(77)
+  await expect(guide).toHaveCount(0)
+  await page.mouse.up()
+  await expect(clip).toHaveAttribute('title', '片段 1 · 1.96 秒')
+})
+
 test('dragging a split clip leaves the other clip in place and creates rests', async ({ page }) => {
   await blank(page)
   await pianoNotes(page)

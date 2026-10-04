@@ -140,6 +140,8 @@ h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; letter-spacing: -.03em;
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #b4eadf; z-index: 5; cursor: ew-resize; touch-action: none; box-shadow: 0 0 8px #93d6ca55; }
 .playhead::before { content: ""; position: absolute; left: -8px; right: -8px; top: 0; bottom: 0; }
 .playhead span { position: absolute; width: 13px; height: 16px; top: 0; left: -6px; background: #b4eadf; clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); }
+.alignment-guide { position: absolute; top: 21px; bottom: 0; z-index: 6; border-left: 1px dashed #f2d699; pointer-events: none; }
+.alignment-guide span { position: absolute; top: 0; left: 5px; padding: 3px 5px; border-radius: 4px; background: #473c28; color: #ffe5b4; font: 10px ui-monospace, monospace; white-space: nowrap; }
 .clip-inspector { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 25px; padding: 12px 14px; background: #14202e; border: 1px solid #26394e; border-radius: 10px; }
 .clip-inspector label { font-size: 10px; }
 .clip-inspector label input:not([type="number"]) { width: 95px; }
@@ -177,18 +179,26 @@ h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; letter-spacing: -.03em;
 .octave-dot.bottom { bottom: 1px; }
 .jianpu-rest { font: 22px Georgia, serif; color: #758ca6; white-space: nowrap; }
 .jianpu-rest small { display: block; font: 8px sans-serif; margin-top: 4px; }
-.keyboard-section { margin-top: 20px; padding: 16px; border-radius: 12px; background: #182536; overflow-x: auto; }
+.keyboard-section { margin-top: 20px; padding: 16px; border-radius: 12px; background: #182536; min-width: 0; }
 .keyboard-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
 .keyboard-copy strong { font-size: 12px; }
 .keyboard-copy > span { font-size: 10px; color: #7f98b5; flex: 1; }
 .keyboard-copy label { font-size: 10px; }
-.keyboard { display: flex; align-items: flex-start; min-width: 466px; width: max-content; }
-.keyboard button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; width: 58px; height: 139px; padding: 9px 4px; border: 1px solid #7c8fa5; border-bottom: 5px solid #687d91; border-radius: 0 0 6px 6px; background: #cbd5df; color: #203447; }
+.keyboard-scroll { overflow-x: auto; padding: 4px 3px 10px; scrollbar-color: #58758b #101925; }
+.keyboard-scroll:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.keyboard { display: flex; align-items: flex-start; width: max-content; min-width: 100%; }
+.keyboard button { position: relative; display: flex; flex: 1 0 44px; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; width: 44px; height: 139px; padding: 9px 4px; border: 1px solid #7c8fa5; border-bottom: 5px solid #687d91; border-radius: 0 0 6px 6px; background: #cbd5df; color: #203447; }
 .keyboard button:hover { background: #e3ecef; }
-.keyboard button.accidental-key { z-index: 2; width: 36px; height: 86px; margin: 0 -18px; border-color: #203047; border-bottom-color: #0b1626; background: #263b51; color: #c2e3dc; }
+.keyboard button.octave-key { background: #a5c9c4; border-bottom-color: #587f79; }
+.keyboard button.octave-key:hover { background: #c0e8df; }
+.keyboard button.accidental-key { z-index: 2; flex: 0 0 28px; width: 28px; height: 86px; margin: 0 -14px; border-color: #203047; border-bottom-color: #0b1626; background: #263b51; color: #c2e3dc; }
 .keyboard button.accidental-key:hover { background: #38566e; }
+.keyboard button:active { background: #93d6ca; color: #132722; }
+.keyboard button:focus-visible { z-index: 3; }
 .keyboard button span { font: 9px ui-monospace, monospace; }
 .keyboard button kbd { font: 13px serif; }
+.middle-c { position: absolute; top: 90px; font-size: 9px; white-space: nowrap; color: #305a51; }
+.keyboard-hint { margin: 7px 0 0; font-size: 10px; color: #7f98b5; }
 .generated-score .section-heading { margin-bottom: 13px; }
 .generated-score .notation-scroll { margin-top: 22px; }
 .generated-score .section-heading button { border-color: #496c68; background: #203e3a; color: #b9dfd6; }
