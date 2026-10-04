@@ -1,6 +1,6 @@
 import * as Tone from 'tone'
-import type { InstrumentId, NoteEvent, Track } from './music'
-import { durationToBeats, midiToName, noteOnsets, trackDurationBeats } from './music'
+import type { InstrumentId, NoteEvent, Track } from './workspace'
+import { durationToBeats, midiToName, noteOnsets, trackDurationBeats } from './workspace'
 
 type Voice = Tone.PolySynth | Tone.Sampler
 let instruments: Record<InstrumentId, Voice> | undefined
@@ -74,9 +74,32 @@ export async function playTracks(tracks: Track[], bpm: number, onStep: (index: n
   tracks.filter((track) => !track.muted).forEach((track) => {
     const onsets = noteOnsets(track.notes)
     track.notes.forEach((note, index) => {
-      const duration = durationToBeats(note.duration) * secondsPerBeat
+      const previous = track.notes[index - 1]
+      const continuesTie = previous?.tieToNext
+        && previous.midi === note.midi
+        && Math.abs(onsets[index] - (onsets[index - 1] + durationToBeats(previous.duration))) < 0.001
+      if (continuesTie) return
+
+      let durationBeats = durationToBeats(note.duration)
+      let tiedIndex = index
+      while (track.notes[tiedIndex]?.tieToNext) {
+        const next = track.notes[tiedIndex + 1]
+        if (!next || next.midi !== note.midi) break
+        const expectedOnset = onsets[tiedIndex] + durationToBeats(track.notes[tiedIndex].duration)
+        if (Math.abs(onsets[tiedIndex + 1] - expectedOnset) >= 0.001) break
+        durationBeats += durationToBeats(next.duration)
+        tiedIndex += 1
+      }
+      if (track.notes[tiedIndex]?.fermata || note.fermata) durationBeats *= 1.5
+
+      const duration = durationBeats * secondsPerBeat
       const onset = onsets[index] * secondsPerBeat
-      synths[track.instrument].triggerAttackRelease(midiToName(note.midi), duration * 0.86, startAt + onset, note.velocity)
+      synths[track.instrument].triggerAttackRelease(
+        midiToName(note.midi, note.spelling),
+        duration * 0.92,
+        startAt + onset,
+        note.velocity,
+      )
       window.setTimeout(() => onStep(index), (onset + 0.08) * 1000)
     })
     longest = Math.max(longest, trackDurationBeats(track.notes) * secondsPerBeat)
