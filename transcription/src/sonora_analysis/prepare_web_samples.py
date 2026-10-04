@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument("--cache", default="assets/samples/cache")
     parser.add_argument("--output", default="public/samples")
     args = parser.parse_args()
-    durations = {"piano": 2.8, "violin": 2.0}
+    durations = {"piano": 2.8, "violin": 2.0, "cello": 2.4, "flute": 2.0}
     results = []
     for record in load_manifest(args.manifest):
         if record.midi != 69:

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import TranscriptionLab from './TranscriptionLab'
 import {
   createProject,
+  isAccidental,
   midiToJianpu,
   midiToName,
   midiToStaffY,
@@ -20,6 +21,13 @@ const durations: { value: Duration; label: string; symbol: string }[] = [
   { value: 0.5, label: '二分音符', symbol: '𝅗𝅥' },
   { value: 0.25, label: '四分音符', symbol: '♩' },
 ]
+
+const instrumentMeta: Record<InstrumentId, { name: string; icon: string; color: string }> = {
+  piano: { name: '原声钢琴', icon: '♬', color: '#d8aa59' },
+  violin: { name: '独奏小提琴', icon: '𝄢', color: '#d47f67' },
+  cello: { name: '大提琴', icon: '𝄢', color: '#9a6b55' },
+  flute: { name: '长笛', icon: '♩', color: '#7b9da6' },
+}
 
 function Staff({ track, activeStep }: { track: Track; activeStep: number }) {
   const onsets = noteOnsets(track.notes)
@@ -41,6 +49,7 @@ function Staff({ track, activeStep }: { track: Track; activeStep: number }) {
           return (
             <g key={note.id} className={index === activeStep ? 'note active' : 'note'}>
               {y >= 110 && <line x1={x - 13} x2={x + 14} y1="116" y2="116" className="ledger" />}
+              {isAccidental(note.midi) && <text x={x - 20} y={y + 5} className="accidental">♯</text>}
               <ellipse cx={x} cy={y} rx="9" ry="6.5" transform={`rotate(-18 ${x} ${y})`} />
               {note.duration !== 1 && <line x1={x + 8} x2={x + 8} y1={y} y2={y - 39} />}
               <text x={x} y="145" textAnchor="middle" className="pitch-label">{midiToName(note.midi)}</text>
@@ -74,7 +83,7 @@ function Jianpu({ track, activeStep }: { track: Track; activeStep: number }) {
 export default function App() {
   const savedProject = useMemo(() => parseProject(localStorage.getItem('sonora.project')), [])
   const [tracks, setTracks] = useState<Track[]>(savedProject?.tracks ?? starterTracks)
-  const [activeTrack, setActiveTrack] = useState<InstrumentId>('piano')
+  const [activeTrack, setActiveTrack] = useState<string>(savedProject?.tracks[0]?.id ?? starterTracks[0].id)
   const [duration, setDuration] = useState<Duration>(0.25)
   const [bpm, setBpm] = useState(savedProject?.bpm ?? 96)
   const [playing, setPlaying] = useState(false)
@@ -94,13 +103,29 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [bpm, tracks])
 
-  function updateTrack(id: InstrumentId, update: (track: Track) => Track) {
+  function updateTrack(id: string, update: (track: Track) => Track) {
     setTracks((current) => current.map((track) => (track.id === id ? update(track) : track)))
   }
 
   function addNote(midi: number) {
     updateTrack(activeTrack, (track) => ({ ...track, notes: [...track.notes, newNote(midi, duration)] }))
-    void import('./audio').then(({ previewNote }) => previewNote(activeTrack, midi))
+    void import('./audio').then(({ previewNote }) => previewNote(currentTrack.instrument, midi))
+  }
+
+  function addTrack(instrument: InstrumentId) {
+    const count = tracks.filter((track) => track.instrument === instrument).length + 1
+    const meta = instrumentMeta[instrument]
+    const track: Track = {
+      id: `${instrument}-${Date.now()}-${count}`,
+      instrument,
+      name: `${meta.name} ${count}`,
+      color: meta.color,
+      muted: false,
+      notes: [],
+    }
+    setTracks((current) => [...current, track])
+    setActiveTrack(track.id)
+    setSaveState(`${track.name}已添加`)
   }
 
   function removeLastNote() {
@@ -126,7 +151,7 @@ export default function App() {
       const imported = midiToProject(await file.arrayBuffer())
       setTracks(imported.tracks)
       setBpm(imported.bpm)
-      setActiveTrack('piano')
+      setActiveTrack(imported.tracks[0].id)
       setSaveState('MIDI 已导入')
     } catch {
       setSaveState('MIDI 导入失败')
@@ -134,8 +159,15 @@ export default function App() {
   }
 
   function importTranscription(notes: ReturnType<typeof newNote>[]) {
-    updateTrack('piano', (track) => ({ ...track, notes }))
-    setActiveTrack('piano')
+    const piano = tracks.find((track) => track.instrument === 'piano')
+    if (piano) {
+      updateTrack(piano.id, (track) => ({ ...track, notes }))
+      setActiveTrack(piano.id)
+    } else {
+      const imported: Track = { id: `piano-${Date.now()}`, instrument: 'piano', name: '转录钢琴', color: '#d8aa59', muted: false, notes }
+      setTracks((current) => [...current, imported])
+      setActiveTrack(imported.id)
+    }
     setView('compose')
     setSaveState('转录结果已导入')
   }
@@ -195,17 +227,22 @@ export default function App() {
           <div className="panel-title"><span>音轨</span><small>{tracks.length} TRACKS</small></div>
           {tracks.map((track) => (
             <button key={track.id} className={track.id === activeTrack ? 'track-card selected' : 'track-card'} onClick={() => setActiveTrack(track.id)}>
-              <span className="instrument-icon" style={{ background: track.color }}>{track.id === 'piano' ? '♬' : '𝄢'}</span>
+              <span className="instrument-icon" style={{ background: track.color }}>{instrumentMeta[track.instrument].icon}</span>
               <span className="track-name"><strong>{track.name}</strong><small>{track.notes.length} 个音符</small></span>
               <i className="track-color" style={{ background: track.color }} />
             </button>
           ))}
-          <button className="add-track" disabled>＋ 添加音轨</button>
+          <div className="add-track-row" aria-label="添加音轨">
+            <button className="add-track" onClick={() => addTrack('piano')}>＋ 钢琴</button>
+            <button className="add-track" onClick={() => addTrack('violin')}>＋ 小提琴</button>
+            <button className="add-track" onClick={() => addTrack('cello')}>＋ 大提琴</button>
+            <button className="add-track" onClick={() => addTrack('flute')}>＋ 长笛</button>
+          </div>
           <div className="phase-card">
-            <span>当前能力</span>
-            <strong>复音转录，保留和弦起音</strong>
-            <div><i style={{ width: '62%' }} /></div>
-            <small>下一步：真实歌曲分轨</small>
+            <span>创作台</span>
+            <strong>四种真实声源，多声部同步回放</strong>
+            <div><i style={{ width: '100%' }} /></div>
+            <small>工程自动保存在此浏览器</small>
           </div>
         </aside>
 
@@ -230,7 +267,7 @@ export default function App() {
           <div className="keyboard-section">
             <div className="keyboard-copy"><strong>输入音符</strong><span>选择时值后点击琴键</span></div>
             <div className="keyboard">
-              {pitches.map((midi) => <button key={midi} onClick={() => addNote(midi)}><span>{midiToName(midi)}</span><kbd>{midiToJianpu(midi).degree}</kbd></button>)}
+              {pitches.map((midi) => <button className={isAccidental(midi) ? 'accidental-key' : ''} key={midi} onClick={() => addNote(midi)}><span>{midiToName(midi)}</span><kbd>{midiToJianpu(midi).degree}</kbd></button>)}
             </div>
           </div>
         </section>

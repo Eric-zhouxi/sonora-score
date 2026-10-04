@@ -44,6 +44,48 @@
       }
     },
     {
+      "id": "uiowa-flute-vibrato-ff-a4",
+      "sourceId": "uiowa-mis",
+      "instrument": "flute",
+      "midi": 69,
+      "note": "A4",
+      "dynamic": "ff",
+      "articulation": "vibrato",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Woodwinds/Flute/Flute.vib.ff.A4.stereo.aif",
+      "fileName": "Flute.vib.ff.A4.stereo.aif",
+      "bytes": 673096,
+      "sha256": "e19ccfc6657e14736c31987a3fdbf0abe87f192fbe2b9041be574e990d4e46b5",
+      "webAsset": {
+        "path": "public/samples/flute-a4.wav",
+        "bytes": 88244,
+        "sha256": "06c91478e965d3e7f413e9862d256c91d575c3b39f214e05f90d343bc0ad3c15"
+      }
+    },
+    {
+      "id": "uiowa-cello-arco-ff-a4",
+      "sourceId": "uiowa-mis",
+      "instrument": "cello",
+      "midi": 69,
+      "note": "A4",
+      "dynamic": "ff",
+      "articulation": "arco-sul-d",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Strings/Cello/Cello.arco.ff.sulD.A4.stereo.aif",
+      "fileName": "Cello.arco.ff.sulD.A4.stereo.aif",
+      "bytes": 1141906,
+      "sha256": "37275d39f127245af42225935cfdcadeab675c7523cc0d1d4697d1694b16d9e8",
+      "webAsset": {
+        "path": "public/samples/cello-a4.wav",
+        "bytes": 105884,
+        "sha256": "428c34c3ca2b919e5a5c07244d6ba49f6a0f763b7a9e9c0072a115cc1ac39d97"
+      }
+    },
+    {
       "id": "uiowa-piano-mf-c4",
       "sourceId": "uiowa-mis",
       "instrument": "piano",

@@ -1,4 +1,4 @@
-export type InstrumentId = 'piano' | 'violin'
+export type InstrumentId = 'piano' | 'violin' | 'cello' | 'flute'
 export type Duration = 0.25 | 0.5 | 1 | 2
 
 export interface NoteEvent {
@@ -11,7 +11,8 @@ export interface NoteEvent {
 }
 
 export interface Track {
-  id: InstrumentId
+  id: string
+  instrument: InstrumentId
   name: string
   color: string
   muted: boolean
@@ -19,7 +20,7 @@ export interface Track {
 }
 
 export interface ProjectData {
-  schemaVersion: 1
+  schemaVersion: 2
   bpm: number
   tracks: Track[]
 }
@@ -29,7 +30,11 @@ const degreeByPitchClass: Record<number, string> = {
   0: '1', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 11: '7',
 }
 
-export const pitches = [60, 62, 64, 65, 67, 69, 71, 72]
+export const pitches = Array.from({ length: 13 }, (_, index) => 60 + index)
+
+export function isAccidental(midi: number): boolean {
+  return [1, 3, 6, 8, 10].includes(midi % 12)
+}
 
 export function midiToName(midi: number): string {
   const octave = Math.floor(midi / 12) - 1
@@ -81,14 +86,16 @@ export function newNote(midi: number, duration: Duration): NoteEvent {
 
 export const starterTracks: Track[] = [
   {
-    id: 'piano',
+    id: 'piano-1',
+    instrument: 'piano',
     name: '原声钢琴',
     color: '#d8aa59',
     muted: false,
     notes: [60, 64, 67, 64, 65, 69, 72, 69].map((midi) => newNote(midi, 0.25)),
   },
   {
-    id: 'violin',
+    id: 'violin-1',
+    instrument: 'violin',
     name: '独奏小提琴',
     color: '#d47f67',
     muted: false,
@@ -97,15 +104,26 @@ export const starterTracks: Track[] = [
 ]
 
 export function createProject(bpm = 96, tracks = starterTracks): ProjectData {
-  return { schemaVersion: 1, bpm, tracks }
+  return { schemaVersion: 2, bpm, tracks }
 }
 
 export function parseProject(value: string | null): ProjectData | null {
   if (!value) return null
   try {
-    const project = JSON.parse(value) as Partial<ProjectData>
-    if (project.schemaVersion !== 1 || !Array.isArray(project.tracks) || typeof project.bpm !== 'number') return null
-    return project as ProjectData
+    const project = JSON.parse(value) as { schemaVersion?: number; bpm?: unknown; tracks?: unknown }
+    if (!Array.isArray(project.tracks) || typeof project.bpm !== 'number') return null
+    if (project.schemaVersion === 2 && project.tracks.every((track) => ['piano', 'violin', 'cello', 'flute'].includes(track.instrument))) {
+      return { schemaVersion: 2, bpm: project.bpm, tracks: project.tracks as Track[] }
+    }
+    if (project.schemaVersion === 1) {
+      const tracks = project.tracks.map((track, index) => {
+        const legacy = track as Omit<Track, 'instrument'> & { instrument?: InstrumentId }
+        const instrument: InstrumentId = legacy.id === 'violin' ? 'violin' : 'piano'
+        return { ...legacy, id: `${instrument}-${index + 1}`, instrument }
+      })
+      return { schemaVersion: 2, bpm: project.bpm, tracks }
+    }
+    return null
   } catch {
     return null
   }
