@@ -43,7 +43,7 @@ class AnalysisTests(unittest.TestCase):
 
     def test_serializes_frontend_contract(self) -> None:
         payload = analyze_wav(wav_bytes((440.0,), duration=0.6)).to_dict()
-        self.assertEqual(payload["engine"], "sonora-dsp-v0.1")
+        self.assertEqual(payload["engine"], "sonora-dsp-v0.2")
         self.assertIn("sampleRate", payload)
         self.assertIn("onsetSeconds", payload["notes"][0])
 

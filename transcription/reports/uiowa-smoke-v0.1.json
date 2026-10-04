@@ -77,5 +77,44 @@
       "predictedMidi": 67,
       "pitchConfidence": 0.8170797588348251
     }
-  ]
+  ],
+  "realSequenceSmoke": {
+    "sequenceCount": 12,
+    "notesPerSequence": 8,
+    "overall": {
+      "expectedNotes": 96,
+      "predictedNotes": 96,
+      "matchedNotes": 93,
+      "onsetPrecision": 0.96875,
+      "onsetRecall": 0.96875,
+      "onsetF1": 0.96875,
+      "noteWithOffsetF1": 0.96875,
+      "meanOnsetErrorMs": 32.644039694730935,
+      "meanOffsetErrorMs": 16.905615292711992
+    },
+    "byInstrument": {
+      "piano": {
+        "expectedNotes": 48,
+        "predictedNotes": 48,
+        "matchedNotes": 48,
+        "onsetPrecision": 1.0,
+        "onsetRecall": 1.0,
+        "onsetF1": 1.0,
+        "noteWithOffsetF1": 1.0,
+        "meanOnsetErrorMs": 6.662887377172828,
+        "meanOffsetErrorMs": 16.56462585033974
+      },
+      "violin": {
+        "expectedNotes": 48,
+        "predictedNotes": 48,
+        "matchedNotes": 45,
+        "onsetPrecision": 0.9375,
+        "onsetRecall": 0.9375,
+        "onsetF1": 0.9375,
+        "noteWithOffsetF1": 0.9375,
+        "meanOnsetErrorMs": 60.357268833459585,
+        "meanOffsetErrorMs": 17.269337364575726
+      }
+    }
+  }
 }

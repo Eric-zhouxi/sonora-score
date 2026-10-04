@@ -1,0 +1,52 @@
+{
+  "sequence": {
+    "dataset": "synthetic-sequences-v1",
+    "sequenceCount": 32,
+    "notesPerSequence": 8,
+    "overall": {
+      "expectedNotes": 256,
+      "predictedNotes": 257,
+      "matchedNotes": 255,
+      "onsetPrecision": 0.9922178988326849,
+      "onsetRecall": 0.99609375,
+      "onsetF1": 0.9941520467836258,
+      "noteWithOffsetF1": 0.9902534113060428,
+      "meanOnsetErrorMs": 27.243137254901963,
+      "meanOffsetErrorMs": 43.77647058823531
+    },
+    "byInstrument": {
+      "piano": {
+        "expectedNotes": 128,
+        "predictedNotes": 128,
+        "matchedNotes": 128,
+        "onsetPrecision": 1.0,
+        "onsetRecall": 1.0,
+        "onsetF1": 1.0,
+        "noteWithOffsetF1": 1.0,
+        "meanOnsetErrorMs": 29.515625000000018,
+        "meanOffsetErrorMs": 46.765625
+      },
+      "violin": {
+        "expectedNotes": 128,
+        "predictedNotes": 129,
+        "matchedNotes": 127,
+        "onsetPrecision": 0.9844961240310077,
+        "onsetRecall": 0.9921875,
+        "onsetF1": 0.9883268482490272,
+        "noteWithOffsetF1": 0.980544747081712,
+        "meanOnsetErrorMs": 24.9527559055118,
+        "meanOffsetErrorMs": 40.763779527559066
+      }
+    }
+  },
+  "chord": {
+    "dataset": "synthetic-triads-v1",
+    "classes": 24,
+    "examples": 72,
+    "accuracy": 1.0,
+    "progressionCount": 6,
+    "progressionChordCount": 48,
+    "progressionAccuracy": 1.0,
+    "errors": []
+  }
+}

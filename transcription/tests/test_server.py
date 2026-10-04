@@ -35,7 +35,7 @@ class ServerTests(unittest.TestCase):
     def test_health(self) -> None:
         status, payload = self.request("GET", "/health")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["engine"], "sonora-dsp-v0.1")
+        self.assertEqual(payload["engine"], "sonora-dsp-v0.2")
 
     def test_transcribes_raw_wav_body(self) -> None:
         status, payload = self.request("POST", "/v1/transcriptions", wav_bytes((440.0,)), "audio/wav")

@@ -9,7 +9,7 @@ Content-Type: audio/wav
 <raw WAV bytes>
 ```
 
-响应返回音符事件、和弦时间轴及每项置信度。当前 `sonora-dsp-v0.1` 用 FFT 自相关估计单音音高，用 chroma 与 24 个大小调模板估计和弦。它的作用是建立可解释、可评测的端到端基线，不冒充最终模型。
+响应返回音符事件、和弦时间轴及每项置信度。当前 `sonora-dsp-v0.2` 用 FFT 自相关估计单音音高，用 chroma 与 24 个大小调模板估计和弦。它的作用是建立可解释、可评测的端到端基线，不冒充最终模型。
 
 若 `transcription/models/timbre-pitch-v0.1.npz` 存在，API 还会返回钢琴/小提琴主乐器类别及置信度。
 
@@ -73,6 +73,24 @@ python -m sonora_analysis.evaluate --output transcription/reports/uiowa-smoke-v0
 - Iowa 测试：8 条真实钢琴/小提琴样本，乐器 accuracy 0.875、macro-F1 0.873，音高 accuracy 1.0。小提琴 G4 被误判为钢琴。
 
 第二项仍是单一来源、小规模 smoke test，只证明真实数据链路打通，不能用于声称模型已经泛化。限制和适用范围见 [`models/MODEL_CARD.md`](models/MODEL_CARD.md)。
+
+## 连续旋律与和弦基准
+
+```bash
+python -m sonora_analysis.benchmark
+```
+
+`sequence-chord-baseline-v0.2.json` 当前覆盖：
+
+- 钢琴/小提琴各 16 条连续旋律，共 256 个音符；
+- pitch+onset F1 0.9942，note-with-offset F1 0.9903；
+- 平均起音误差 27.2ms，平均结束误差 43.8ms；
+- 24 类大小三和弦、72 个独立样本准确率 1.0；
+- 6 条和弦进行、48 个和弦节点准确率 1.0。
+
+这些仍是代码生成的受控数据，主要用于阻止计时、半音分段和颤音处理回归。下一步必须加入真实旋律与真实和弦录音。
+
+此外，评测脚本会用八条 Iowa 单音录音拼接 12 条未见连续旋律（96 个音符）。当前真实拼接 smoke 的 pitch+onset F1 和 note-with-offset F1 均为 0.9688；钢琴为 1.0，小提琴为 0.9375。它比纯合成序列更接近真实音色，但仍不等价于自然演奏录音。
 
 ## 后续模型后端
 

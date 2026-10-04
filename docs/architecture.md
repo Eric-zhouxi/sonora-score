@@ -33,13 +33,16 @@
 - [x] 可运行的单音/和弦 DSP 基线 API
 - [x] C4–B4 钢琴/小提琴单音 smoke 模型与可复现训练
 - [x] 八条 Iowa 真实录音的最小域外评测
+- [x] 连续钢琴/小提琴旋律的 onset/offset 基准与回归门槛
+- [x] Iowa 单音重组的 96 音符真实音色连续序列 smoke test
 - Basic Pitch 推理 API，返回标准化 NoteEvent
 - 扩展 University of Iowa 真实评测覆盖音域、力度和演奏法
 - 指标：pitch accuracy、instrument macro-F1、onset F1、note-with-offset F1
 
 ### M2：和弦与钢琴复音
 
-- 12 维 chroma 基线和 24 个大小调三和弦模板
+- [x] 12 维 chroma 基线和 24 个大小调三和弦模板
+- [x] 72 个独立三和弦与 48 节点和弦进行合成基准
 - Basic Pitch 多音高事件聚类成和弦标签
 - MAESTRO/MAPS 等数据集的许可审查与离线评测
 

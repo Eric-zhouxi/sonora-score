@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import math
 import wave
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
@@ -52,7 +52,7 @@ class Analysis:
     duration_seconds: float
     notes: tuple[NoteEvent, ...]
     chords: tuple[ChordEvent, ...]
-    engine: str = "sonora-dsp-v0.1"
+    engine: str = "sonora-dsp-v0.2"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -158,7 +158,9 @@ def _pitch_from_frame(frame: np.ndarray, sample_rate: int) -> tuple[float, float
 
 
 def detect_notes(samples: np.ndarray, sample_rate: int) -> tuple[NoteEvent, ...]:
-    frame_size = max(2048, 1 << int(math.ceil(math.log2(sample_rate * 0.09))))
+    # About 40ms of analysis (rounded up to a power of two) keeps onset latency
+    # comparable across 16–96kHz material while retaining several periods of C2+.
+    frame_size = max(2048, 1 << int(math.ceil(math.log2(sample_rate * 0.04))))
     hop = frame_size // 4
     observations: list[tuple[int, int, float, float] | None] = []
     for start, frame in _frames(samples, frame_size, hop):
@@ -168,7 +170,23 @@ def detect_notes(samples: np.ndarray, sample_rate: int) -> tuple[NoteEvent, ...]
             continue
         frequency, confidence = pitch
         midi = int(round(69 + 12 * math.log2(frequency / 440.0)))
-        observations.append((start, midi, frequency, confidence) if 21 <= midi <= 108 else None)
+        frame_center = start + frame_size // 2
+        observations.append((frame_center, midi, frequency, confidence) if 21 <= midi <= 108 else None)
+
+    # Median filtering prevents expressive vibrato around a semitone boundary from
+    # becoming a burst of false note onsets while preserving sustained pitch changes.
+    smoothed: list[tuple[int, int, float, float] | None] = []
+    for index, observation in enumerate(observations):
+        if observation is None:
+            smoothed.append(None)
+            continue
+        neighborhood = [
+            item[1]
+            for item in observations[max(0, index - 2) : index + 3]
+            if item is not None
+        ]
+        smoothed.append((observation[0], int(round(float(np.median(neighborhood)))), observation[2], observation[3]))
+    observations = smoothed
 
     events: list[NoteEvent] = []
     run: list[tuple[int, int, float, float]] = []
@@ -184,11 +202,15 @@ def detect_notes(samples: np.ndarray, sample_rate: int) -> tuple[NoteEvent, ...]
             run.clear()
             return
         start = filtered[0][0]
-        end = filtered[-1][0] + frame_size
+        end = filtered[-1][0] + hop // 2
+        duration_seconds = max(hop, end - start) / sample_rate
+        if duration_seconds < 0.075:
+            run.clear()
+            return
         events.append(NoteEvent(
             midi=midi,
             onset_seconds=start / sample_rate,
-            duration_seconds=(end - start) / sample_rate,
+            duration_seconds=duration_seconds,
             frequency_hz=float(np.median([item[2] for item in filtered])),
             confidence=float(np.mean([item[3] for item in filtered])),
         ))
@@ -197,7 +219,7 @@ def detect_notes(samples: np.ndarray, sample_rate: int) -> tuple[NoteEvent, ...]
     for observation in observations:
         if observation is None:
             flush()
-        elif not run or abs(observation[1] - int(round(float(np.median([item[1] for item in run]))))) <= 1:
+        elif not run or observation[1] == int(round(float(np.median([item[1] for item in run])))):
             run.append(observation)
         else:
             flush()

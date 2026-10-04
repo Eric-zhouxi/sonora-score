@@ -37,7 +37,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/health":
-            self._json(200, {"status": "ok", "engine": "sonora-dsp-v0.1"})
+            self._json(200, {"status": "ok", "engine": "sonora-dsp-v0.2"})
         else:
             self._json(404, {"error": "not found"})
 

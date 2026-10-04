@@ -16,6 +16,7 @@ sonora-train = "sonora_analysis.train:main"
 sonora-evaluate = "sonora_analysis.evaluate:main"
 sonora-fetch-samples = "sonora_analysis.samples:main"
 sonora-prepare-samples = "sonora_analysis.prepare_web_samples:main"
+sonora-benchmark = "sonora_analysis.benchmark:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
