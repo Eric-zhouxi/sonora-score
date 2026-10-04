@@ -6,6 +6,8 @@ export interface NoteEvent {
   midi: number
   duration: Duration
   velocity: number
+  /** Absolute start in quarter-note beats. Omitted notes follow the previous note. */
+  onsetBeats?: number
 }
 
 export interface Track {
@@ -52,6 +54,20 @@ export function midiToStaffY(midi: number): number {
 
 export function durationToBeats(duration: Duration): number {
   return duration * 4
+}
+
+export function noteOnsets(notes: NoteEvent[]): number[] {
+  let cursor = 0
+  return notes.map((note) => {
+    const onset = note.onsetBeats ?? cursor
+    cursor = Math.max(cursor, onset + durationToBeats(note.duration))
+    return onset
+  })
+}
+
+export function trackDurationBeats(notes: NoteEvent[]): number {
+  const onsets = noteOnsets(notes)
+  return notes.reduce((end, note, index) => Math.max(end, onsets[index] + durationToBeats(note.duration)), 0)
 }
 
 export function newNote(midi: number, duration: Duration): NoteEvent {

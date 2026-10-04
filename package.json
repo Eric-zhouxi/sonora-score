@@ -10,6 +10,7 @@
     "check": "tsc -b"
   },
   "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
     "@tonejs/midi": "2.0.28",
     "react": "19.3.0",
     "react-dom": "19.3.0",

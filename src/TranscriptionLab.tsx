@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import type { NoteEvent } from './music'
 import { midiToName, newNote, type Duration } from './music'
 
+type AnalysisEngine = 'basic-pitch' | 'dsp'
+
 interface ApiNote {
   midi: number
   onsetSeconds: number
@@ -53,10 +55,11 @@ async function waveformFromFile(file: File): Promise<number[]> {
 export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImport: (notes: NoteEvent[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
+  const [engine, setEngine] = useState<AnalysisEngine>('basic-pitch')
   const [waveform, setWaveform] = useState<number[]>([])
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [status, setStatus] = useState<'idle' | 'ready' | 'working' | 'done' | 'error'>('idle')
-  const [message, setMessage] = useState('支持 PCM WAV；首版基线适合钢琴单音、旋律与稳定和弦。')
+  const [message, setMessage] = useState('AI 复音引擎在浏览器本地运行，适合钢琴、吉他等单乐器录音。')
 
   async function chooseFile(selected?: File) {
     if (!selected) return
@@ -76,21 +79,32 @@ export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImp
   async function analyze() {
     if (!file) return
     setStatus('working')
-    setMessage('正在提取音高、起音与和弦色度…')
+    setMessage(engine === 'basic-pitch' ? '正在加载模型并识别重叠音符…' : '正在提取音高、起音与和弦色度…')
     try {
-      const response = await fetch('/api/v1/transcriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': file.type || 'audio/wav' },
-        body: file,
-      })
-      if (!response.ok) throw new Error(await response.text())
-      const data = await response.json() as AnalysisResult
+      let data: AnalysisResult
+      if (engine === 'basic-pitch') {
+        const { transcribeWithBasicPitch } = await import('./basicPitch')
+        data = await transcribeWithBasicPitch(file, (progress) => {
+          setMessage(`AI 复音分析 ${Math.round(progress * 100)}% · 音频不会上传`)
+        })
+      } else {
+        const response = await fetch('/api/v1/transcriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': file.type || 'audio/wav' },
+          body: file,
+        })
+        if (!response.ok) throw new Error(await response.text())
+        data = await response.json() as AnalysisResult
+      }
       setResult(data)
       setStatus('done')
       setMessage(`完成：识别到 ${data.notes.length} 个音符、${data.chords.length} 个和弦片段。`)
-    } catch {
+    } catch (error) {
+      console.error(error)
       setStatus('error')
-      setMessage('转录服务未启动或文件格式不受支持。请先运行 transcription 本地服务。')
+      setMessage(engine === 'basic-pitch'
+        ? 'AI 转录失败：请确认浏览器能解码该音频，或改用 WAV。'
+        : 'DSP 服务未启动或格式不受支持。请先运行 transcription 本地服务。')
     }
   }
 
@@ -99,6 +113,7 @@ export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImp
     onImport(result.notes.map((note) => ({
       ...newNote(note.midi, nearestDuration(note.durationSeconds, bpm)),
       velocity: Math.max(0.25, Math.min(1, note.confidence)),
+      onsetBeats: note.onsetSeconds / (60 / bpm),
     })))
   }
 
@@ -107,14 +122,22 @@ export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImp
       <div className="lab-intro">
         <p className="eyebrow">M1 / AUDIO TO SCORE</p>
         <h2>听见声音，<br /><span>拆出它的音符与和弦。</span></h2>
-        <p>先以可解释的 DSP 基线建立评测闭环，之后可无缝替换为 Basic Pitch 或自训练模型。</p>
+        <p>默认使用 Spotify Basic Pitch 在浏览器内识别复音；DSP 基线保留为可解释、可评测的回退路径。</p>
       </div>
       <div className="upload-card">
-        <input ref={inputRef} type="file" accept="audio/wav,.wav" hidden onChange={(event) => void chooseFile(event.target.files?.[0])} />
+        <div className="engine-switch" role="group" aria-label="转录引擎">
+          <button className={engine === 'basic-pitch' ? 'active' : ''} onClick={() => setEngine('basic-pitch')}>
+            <strong>AI 复音</strong><small>浏览器内 · 推荐</small>
+          </button>
+          <button className={engine === 'dsp' ? 'active' : ''} onClick={() => setEngine('dsp')}>
+            <strong>DSP 基线</strong><small>本地服务 · WAV</small>
+          </button>
+        </div>
+        <input ref={inputRef} type="file" accept={engine === 'dsp' ? 'audio/wav,.wav' : 'audio/*,.wav,.mp3,.ogg,.flac'} hidden onChange={(event) => void chooseFile(event.target.files?.[0])} />
         <button className="drop-zone" onClick={() => inputRef.current?.click()}>
           <span className="upload-icon">↥</span>
-          <strong>{file ? file.name : '选择一段钢琴 WAV 音频'}</strong>
-          <small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '文件只在本机转录服务中处理'}</small>
+          <strong>{file ? file.name : `选择一段${engine === 'dsp' ? ' PCM WAV' : '单乐器'}音频`}</strong>
+          <small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : engine === 'basic-pitch' ? '支持浏览器可解码格式 · 不上传' : '文件发送至本机 DSP 服务'}</small>
         </button>
         <div className="waveform" aria-label="音频波形">
           {(waveform.length ? waveform : Array.from({ length: 72 }, () => 0.08)).map((value, index) => (
@@ -135,7 +158,7 @@ export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImp
           </div>
           <div className="result-metrics">
             <div><strong>{result.durationSeconds.toFixed(1)}s</strong><span>音频时长</span></div>
-            <div><strong>{result.notes.length}</strong><span>音符事件</span></div>
+            <div><strong>{result.notes.length}</strong><span>复音音符事件</span></div>
             <div><strong>{result.chords.length}</strong><span>和弦片段</span></div>
             <div><strong>{result.instrument ? (result.instrument.label === 'piano' ? '钢琴' : '小提琴') : '—'}</strong><span>主乐器 {result.instrument ? `${Math.round(result.instrument.confidence * 100)}%` : '模型未加载'}</span></div>
           </div>

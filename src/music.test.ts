@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { durationToBeats, midiToJianpu, midiToName, midiToStaffY } from './music'
+import { durationToBeats, midiToJianpu, midiToName, midiToStaffY, newNote, noteOnsets, type NoteEvent } from './music'
 
 describe('music mapping', () => {
   it('maps middle C to staff, scientific pitch and jianpu', () => {
@@ -17,5 +17,11 @@ describe('music mapping', () => {
   it('converts notation durations to quarter-note beats', () => {
     expect(durationToBeats(0.25)).toBe(1)
     expect(durationToBeats(1)).toBe(4)
+  })
+
+  it('supports explicit overlapping onsets and sequential notes together', () => {
+    const notes: NoteEvent[] = [60, 64, 67].map((midi) => ({ ...newNote(midi, 0.25), onsetBeats: 0 }))
+    notes.push(newNote(72, 0.25))
+    expect(noteOnsets(notes)).toEqual([0, 0, 0, 1])
   })
 })

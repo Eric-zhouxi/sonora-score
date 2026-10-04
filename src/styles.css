@@ -103,6 +103,10 @@ footer { display: flex; justify-content: space-between; padding: 0 4vw 28px; col
 .lab-intro > p:last-child { max-width: 390px; margin-top: 24px; color: #74756f; font-size: 13px; line-height: 1.85; }
 .upload-card, .analysis-result { min-width: 0; background: var(--paper); border: 1px solid rgba(38,45,48,.12); box-shadow: 0 16px 45px rgba(42,40,34,.08); }
 .upload-card { padding: 20px; }
+.engine-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.engine-switch button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 11px 12px; border: 1px solid #d3cec3; border-radius: 2px; background: #eeeae1; color: #77756e; cursor: pointer; }
+.engine-switch button.active { border-color: #303a40; background: #303a40; color: #f1c773; }
+.engine-switch strong { font-size: 11px; }.engine-switch small { font-size: 8px; opacity: .72; }
 .drop-zone { width: 100%; height: 145px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; border: 1px dashed #afa99d; background: rgba(255,255,255,.28); cursor: pointer; }
 .drop-zone:hover { border-color: var(--gold); background: #fffbf1; }
 .drop-zone .upload-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: #edc778; font-size: 21px; }

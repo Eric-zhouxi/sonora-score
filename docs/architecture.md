@@ -10,7 +10,7 @@
 采样器或合成器回放 → 用户修订 → 经授权的数据闭环
 ```
 
-`NoteEvent` 是系统核心中间格式，当前包含 MIDI 音高、时值和力度。后续会增加 onset、offset、置信度、bend、source instrument 和 provenance。
+`NoteEvent` 是系统核心中间格式，当前包含 MIDI 音高、时值、力度和可选的绝对起音拍数；因此和弦导入、播放和 MIDI 导出都会保留重叠关系。后续会增加置信度、bend、source instrument 和 provenance。
 
 ## 为什么不立即从零训练
 
@@ -35,7 +35,7 @@
 - [x] 八条 Iowa 真实录音的最小域外评测
 - [x] 连续钢琴/小提琴旋律的 onset/offset 基准与回归门槛
 - [x] Iowa 单音重组的 96 音符真实音色连续序列 smoke test
-- Basic Pitch 推理 API，返回标准化 NoteEvent
+- [x] Basic Pitch 浏览器推理，返回标准化音高、起音、时长与置信度
 - 扩展 University of Iowa 真实评测覆盖音域、力度和演奏法
 - 指标：pitch accuracy、instrument macro-F1、onset F1、note-with-offset F1
 
@@ -43,7 +43,9 @@
 
 - [x] 12 维 chroma 基线和 24 个大小调三和弦模板
 - [x] 72 个独立三和弦与 48 节点和弦进行合成基准
-- Basic Pitch 多音高事件聚类成和弦标签
+- [x] Basic Pitch 同时输出重叠音符事件
+- [x] 多音高事件按 250ms 时间窗聚类成大小三和弦标签
+- 在真实钢琴和弦录音上建立独立评测与阈值校准
 - MAESTRO/MAPS 等数据集的许可审查与离线评测
 
 ### M3：多乐器歌曲
@@ -54,6 +56,7 @@
 
 ## 服务边界
 
-- `src/`：浏览器创作台与后续审谱界面。
+- `src/`：浏览器创作台、Basic Pitch 复音推理与审谱界面。
 - `transcription/`：Python 推理/训练环境，不与前端 Node 依赖混装。
 - `assets/samples/`：只存 manifest 和小型、许可允许的资源；大样本用下载脚本与缓存。
+- `public/models/basic-pitch/`：随应用部署的官方 TensorFlow.js 模型和 Apache-2.0 许可证。

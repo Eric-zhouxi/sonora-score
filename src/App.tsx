@@ -6,6 +6,7 @@ import {
   midiToName,
   midiToStaffY,
   newNote,
+  noteOnsets,
   parseProject,
   pitches,
   starterTracks,
@@ -21,7 +22,9 @@ const durations: { value: Duration; label: string; symbol: string }[] = [
 ]
 
 function Staff({ track, activeStep }: { track: Track; activeStep: number }) {
-  const width = Math.max(760, track.notes.length * 76 + 130)
+  const onsets = noteOnsets(track.notes)
+  const timelineBeats = track.notes.reduce((end, note, index) => Math.max(end, onsets[index] + note.duration * 4), 0)
+  const width = Math.max(760, timelineBeats * 58 + 180)
   return (
     <div className="staff-scroll" aria-label={`${track.name}五线谱`}>
       <svg className="staff" viewBox={`0 0 ${width} 160`} role="img">
@@ -33,7 +36,7 @@ function Staff({ track, activeStep }: { track: Track; activeStep: number }) {
         <text x="105" y="86" className="meter">4</text>
         <text x="105" y="108" className="meter">4</text>
         {track.notes.map((note, index) => {
-          const x = 146 + index * 76
+          const x = 146 + onsets[index] * 58
           const y = midiToStaffY(note.midi)
           return (
             <g key={note.id} className={index === activeStep ? 'note active' : 'note'}>
@@ -199,10 +202,10 @@ export default function App() {
           ))}
           <button className="add-track" disabled>＋ 添加音轨</button>
           <div className="phase-card">
-            <span>下一阶段</span>
-            <strong>上传音频，自动生成谱面</strong>
-            <div><i style={{ width: '18%' }} /></div>
-            <small>转录引擎正在搭建</small>
+            <span>当前能力</span>
+            <strong>复音转录，保留和弦起音</strong>
+            <div><i style={{ width: '62%' }} /></div>
+            <small>下一步：真实歌曲分轨</small>
           </div>
         </aside>
 

@@ -1,5 +1,5 @@
 import { Midi } from '@tonejs/midi'
-import { durationToBeats, newNote, type Duration, type InstrumentId, type Track } from './music'
+import { durationToBeats, newNote, noteOnsets, type Duration, type InstrumentId, type Track } from './music'
 
 const supportedDurations: Duration[] = [0.25, 0.5, 1, 2]
 
@@ -16,11 +16,10 @@ export function projectToMidi(tracks: Track[], bpm: number): Uint8Array {
     const target = midi.addTrack()
     target.name = source.name
     target.instrument.number = source.id === 'violin' ? 40 : 0
-    let beats = 0
-    source.notes.forEach((note) => {
+    const onsets = noteOnsets(source.notes)
+    source.notes.forEach((note, index) => {
       const durationTicks = durationToBeats(note.duration)
-      target.addNote({ midi: note.midi, ticks: midi.header.ppq * beats, durationTicks: midi.header.ppq * durationTicks, velocity: note.velocity })
-      beats += durationTicks
+      target.addNote({ midi: note.midi, ticks: midi.header.ppq * onsets[index], durationTicks: midi.header.ppq * durationTicks, velocity: note.velocity })
     })
   })
   return midi.toArray()
@@ -41,7 +40,11 @@ export function midiToProject(bytes: ArrayBuffer): { bpm: number; tracks: Track[
       muted: false,
       notes: [...track.notes]
         .sort((a, b) => a.ticks - b.ticks)
-        .map((note) => ({ ...newNote(note.midi, closestDuration(note.durationTicks / midi.header.ppq)), velocity: note.velocity })),
+        .map((note) => ({
+          ...newNote(note.midi, closestDuration(note.durationTicks / midi.header.ppq)),
+          velocity: note.velocity,
+          onsetBeats: note.ticks / midi.header.ppq,
+        })),
     }
   })
 

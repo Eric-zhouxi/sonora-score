@@ -1,6 +1,6 @@
 import * as Tone from 'tone'
 import type { InstrumentId, NoteEvent, Track } from './music'
-import { durationToBeats, midiToName } from './music'
+import { durationToBeats, midiToName, noteOnsets, trackDurationBeats } from './music'
 
 type Voice = Tone.PolySynth | Tone.Sampler
 let instruments: Record<InstrumentId, Voice> | undefined
@@ -58,14 +58,14 @@ export async function playTracks(tracks: Track[], bpm: number, onStep: (index: n
   let longest = 0
 
   tracks.filter((track) => !track.muted).forEach((track) => {
-    let cursor = 0
+    const onsets = noteOnsets(track.notes)
     track.notes.forEach((note, index) => {
       const duration = durationToBeats(note.duration) * secondsPerBeat
-      synths[track.id].triggerAttackRelease(midiToName(note.midi), duration * 0.86, startAt + cursor, note.velocity)
-      window.setTimeout(() => onStep(index), (cursor + 0.08) * 1000)
-      cursor += duration
+      const onset = onsets[index] * secondsPerBeat
+      synths[track.id].triggerAttackRelease(midiToName(note.midi), duration * 0.86, startAt + onset, note.velocity)
+      window.setTimeout(() => onStep(index), (onset + 0.08) * 1000)
     })
-    longest = Math.max(longest, cursor)
+    longest = Math.max(longest, trackDurationBeats(track.notes) * secondsPerBeat)
   })
 
   return longest * 1000 + 250
