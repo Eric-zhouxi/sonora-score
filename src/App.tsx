@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState } from 'react'
-import { playTracks, previewNote, stopPlayback } from './audio'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import TranscriptionLab from './TranscriptionLab'
 import {
+  createProject,
   midiToJianpu,
   midiToName,
   midiToStaffY,
   newNote,
+  parseProject,
   pitches,
   starterTracks,
   type Duration,
@@ -67,14 +69,27 @@ function Jianpu({ track, activeStep }: { track: Track; activeStep: number }) {
 }
 
 export default function App() {
-  const [tracks, setTracks] = useState<Track[]>(starterTracks)
+  const savedProject = useMemo(() => parseProject(localStorage.getItem('sonora.project')), [])
+  const [tracks, setTracks] = useState<Track[]>(savedProject?.tracks ?? starterTracks)
   const [activeTrack, setActiveTrack] = useState<InstrumentId>('piano')
   const [duration, setDuration] = useState<Duration>(0.25)
-  const [bpm, setBpm] = useState(96)
+  const [bpm, setBpm] = useState(savedProject?.bpm ?? 96)
   const [playing, setPlaying] = useState(false)
   const [activeStep, setActiveStep] = useState(-1)
+  const [view, setView] = useState<'compose' | 'transcribe'>('compose')
+  const [saveState, setSaveState] = useState('本地草稿已保存')
   const playbackTimer = useRef<number | undefined>(undefined)
+  const midiInput = useRef<HTMLInputElement>(null)
   const currentTrack = useMemo(() => tracks.find((track) => track.id === activeTrack)!, [tracks, activeTrack])
+
+  useEffect(() => {
+    setSaveState('正在保存…')
+    const timer = window.setTimeout(() => {
+      localStorage.setItem('sonora.project', JSON.stringify(createProject(bpm, tracks)))
+      setSaveState('本地草稿已保存')
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [bpm, tracks])
 
   function updateTrack(id: InstrumentId, update: (track: Track) => Track) {
     setTracks((current) => current.map((track) => (track.id === id ? update(track) : track)))
@@ -82,15 +97,49 @@ export default function App() {
 
   function addNote(midi: number) {
     updateTrack(activeTrack, (track) => ({ ...track, notes: [...track.notes, newNote(midi, duration)] }))
-    void previewNote(activeTrack, midi)
+    void import('./audio').then(({ previewNote }) => previewNote(activeTrack, midi))
   }
 
   function removeLastNote() {
     updateTrack(activeTrack, (track) => ({ ...track, notes: track.notes.slice(0, -1) }))
   }
 
+  async function exportMidi() {
+    const { projectToMidi } = await import('./midi')
+    const bytes = projectToMidi(tracks, bpm)
+    const blob = new Blob([Uint8Array.from(bytes).buffer], { type: 'audio/midi' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'sonora-score.mid'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function importMidi(file?: File) {
+    if (!file) return
+    try {
+      const { midiToProject } = await import('./midi')
+      const imported = midiToProject(await file.arrayBuffer())
+      setTracks(imported.tracks)
+      setBpm(imported.bpm)
+      setActiveTrack('piano')
+      setSaveState('MIDI 已导入')
+    } catch {
+      setSaveState('MIDI 导入失败')
+    }
+  }
+
+  function importTranscription(notes: ReturnType<typeof newNote>[]) {
+    updateTrack('piano', (track) => ({ ...track, notes }))
+    setActiveTrack('piano')
+    setView('compose')
+    setSaveState('转录结果已导入')
+  }
+
   async function togglePlayback() {
     if (playing) {
+      const { stopPlayback } = await import('./audio')
       stopPlayback()
       if (playbackTimer.current) window.clearTimeout(playbackTimer.current)
       setPlaying(false)
@@ -98,6 +147,7 @@ export default function App() {
       return
     }
     setPlaying(true)
+    const { playTracks } = await import('./audio')
     const playbackLength = await playTracks(tracks, bpm, setActiveStep)
     playbackTimer.current = window.setTimeout(() => {
       setPlaying(false)
@@ -114,12 +164,13 @@ export default function App() {
           <span>SCORE LAB</span>
         </div>
         <nav>
-          <button className="nav-item active">创作台</button>
-          <button className="nav-item" disabled>智能扒谱 <small>即将推出</small></button>
+          <button className={view === 'compose' ? 'nav-item active' : 'nav-item'} onClick={() => setView('compose')}>创作台</button>
+          <button className={view === 'transcribe' ? 'nav-item active' : 'nav-item'} onClick={() => setView('transcribe')}>智能扒谱 <small>ALPHA</small></button>
         </nav>
-        <div className="status-pill"><i /> 本地草稿已保存</div>
+        <div className="status-pill"><i /> {saveState}</div>
       </header>
 
+      {view === 'compose' ? <>
       <section className="workspace-header">
         <div>
           <p className="eyebrow">PROJECT 01 / UNTITLED</p>
@@ -159,6 +210,9 @@ export default function App() {
           <div className="score-toolbar">
             <div className="view-switch"><button className="active">五线谱</button><button>简谱同步</button></div>
             <div className="duration-picker">
+              <input ref={midiInput} type="file" accept="audio/midi,.mid,.midi" hidden onChange={(event) => void importMidi(event.target.files?.[0])} />
+              <button className="text-tool" title="导入 MIDI" onClick={() => midiInput.current?.click()}>导入</button>
+              <button className="text-tool" title="导出 MIDI" onClick={() => void exportMidi()}>导出</button>
               {durations.map((item) => <button key={item.value} title={item.label} className={duration === item.value ? 'active' : ''} onClick={() => setDuration(item.value)}>{item.symbol}</button>)}
               <button title="删除末尾音符" onClick={removeLastNote}>⌫</button>
             </div>
@@ -178,6 +232,7 @@ export default function App() {
           </div>
         </section>
       </section>
+      </> : <TranscriptionLab bpm={bpm} onImport={importTranscription} />}
 
       <footer>
         <span>SONORA SCORE · MVP 0.1</span>

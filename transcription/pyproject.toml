@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sonora-analysis"
+version = "0.1.0"
+description = "Explainable monophonic pitch and chord baseline for Sonora Score"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26"]
+
+[project.scripts]
+sonora-analyze = "sonora_analysis.__main__:main"
+sonora-server = "sonora_analysis.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

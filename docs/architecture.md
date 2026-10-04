@@ -23,13 +23,14 @@
 - [x] 音符、五线谱、简谱统一映射
 - [x] 钢琴/小提琴双音轨与合成回放
 - [x] 基础节拍与音符时值
-- [ ] MIDI 导入导出
-- [ ] 本地工程持久化
+- [x] MIDI 导入导出
+- [x] 本地工程持久化
 - [ ] 接入采样音色并记录许可证
 
 ### M1：钢琴单音与旋律
 
-- 音频上传和波形预览
+- [x] 音频上传和波形预览
+- [x] 可运行的单音/和弦 DSP 基线 API
 - Basic Pitch 推理 API，返回标准化 NoteEvent
 - 单音合成集 + University of Iowa 真实样本评测
 - 指标：pitch accuracy、onset F1、note-with-offset F1

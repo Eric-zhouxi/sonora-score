@@ -8,6 +8,8 @@
 - 同步查看五线谱、简谱和科学音高记法
 - 选择全音符、二分音符或四分音符
 - 调整速度并播放多音轨作品
+- 导入、导出标准 MIDI 文件，并自动保存浏览器草稿
+- 上传 WAV、预览波形并调用本地基线识别音符与和弦
 - 运行基础音乐映射测试
 
 ## 本地运行
@@ -34,7 +36,7 @@ npm run build
 4. 多乐器：先做音源分离，再分别转录并估计乐器类别。
 5. 人工修订闭环：用户修订结果回流为经授权的训练数据。
 
-转录服务的接口设计与数据策略见 [`docs/architecture.md`](docs/architecture.md) 和 [`transcription/README.md`](transcription/README.md)。
+转录服务现在已有可运行的 DSP 基线；安装与启动方式见 [`transcription/README.md`](transcription/README.md)。完整接口与数据策略见 [`docs/architecture.md`](docs/architecture.md)。
 
 ## 声源原则
 
