@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "samples": [],
+  "sources": [
+    {
+      "id": "uiowa-mis",
+      "name": "University of Iowa Musical Instrument Samples",
+      "url": "https://theremin.music.uiowa.edu/MIS.html",
+      "licenseNote": "Provider states samples may be downloaded and used for any projects without restrictions; verify and preserve the source statement when importing files."
+    }
+  ]
+}

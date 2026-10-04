@@ -1,0 +1,45 @@
+# Sonora Score
+
+一个从谱曲走向智能扒谱的音乐工作台。当前 MVP 已打通：**五线谱 / 简谱 / MIDI 音高映射 → 多音轨编辑 → 浏览器合成回放**。
+
+## 现在可以做什么
+
+- 在钢琴与小提琴音轨中输入 C4–C5 音符
+- 同步查看五线谱、简谱和科学音高记法
+- 选择全音符、二分音符或四分音符
+- 调整速度并播放多音轨作品
+- 运行基础音乐映射测试
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+构建与测试：
+
+```bash
+npm test
+npm run build
+```
+
+## 扒谱路线
+
+项目不会一开始就训练昂贵的大模型。我们先建立可度量的基线：
+
+1. 单音：合成/真实钢琴样本上的音高分类。
+2. 单乐器旋律：onset + frame 检测并输出 MIDI。
+3. 钢琴和弦：多音高检测 + chroma 和弦模板。
+4. 多乐器：先做音源分离，再分别转录并估计乐器类别。
+5. 人工修订闭环：用户修订结果回流为经授权的训练数据。
+
+转录服务的接口设计与数据策略见 [`docs/architecture.md`](docs/architecture.md) 和 [`transcription/README.md`](transcription/README.md)。
+
+## 声源原则
+
+仓库不直接提交体积庞大的采样包。默认音色由 Tone.js 合成器提供；后续采样器优先接入 University of Iowa Musical Instrument Samples 等许可清晰的来源。任何下载的样本都必须把来源、许可、原始文件名和校验和写入 `assets/samples/manifest.json`。
+
+## 许可
+
+代码采用 MIT License。第三方模型、数据集和乐器样本分别遵守各自许可，不能因为本项目采用 MIT 就视为可再许可。

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+*.pyc
+__pycache__/
+.venv/
+.env
+.DS_Store
+transcription/output/
