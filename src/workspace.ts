@@ -17,6 +17,7 @@ export interface NoteEvent {
   spelling?: AccidentalSpelling
   tieToNext?: boolean
   fermata?: boolean
+  staff?: 'treble' | 'bass'
 }
 
 export interface Clip {

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 async function blank(page: Page) {
   await page.goto('/')
@@ -13,6 +14,46 @@ async function pianoNotes(page: Page) {
   await page.getByRole('button', { name: 'C4 1', exact: true }).click()
   await page.getByRole('button', { name: 'E4 3', exact: true }).click()
 }
+
+test('piano grand staff renders both key signatures and preserves manual staff assignment', async ({ page }) => {
+  await blank(page)
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  const keyboard = page.getByRole('region', { name: '多八度音符键盘' })
+  for (const name of ['C3 1', 'C4 1', 'E5 3']) await keyboard.getByRole('button', { name, exact: true }).click()
+  const treble = page.locator('.staff[data-clef="treble"]'), bass = page.locator('.staff[data-clef="bass"]')
+  await expect(treble.locator('.score-note')).toHaveCount(2)
+  await expect(bass.locator('.score-note')).toHaveCount(1)
+  await expect(bass.locator('.score-clef')).toHaveText('𝄢')
+  await expect(treble.locator('.score-clef')).toHaveText('𝄞')
+  await expect(bass.locator('.score-rest')).not.toHaveCount(0)
+  await page.getByRole('combobox', { name: '声部调号', exact: true }).selectOption('D')
+  for (const staff of [treble, bass]) await expect(staff.locator('.key-signature text')).toHaveText(['♯', '♯'])
+  await page.getByRole('combobox', { name: '声部调号', exact: true }).selectOption('C')
+  await expect(page.locator('.key-signature text')).toHaveCount(0)
+  await page.getByRole('combobox', { name: '声部调号', exact: true }).selectOption('B♭')
+  for (const staff of [treble, bass]) await expect(staff.locator('.key-signature text')).toHaveText(['♭', '♭'])
+  await expect(bass.locator('.key-signature text').first()).toHaveAttribute('y', '109')
+  await treble.locator('.score-note').filter({ has: page.locator('text.pitch-caption').filter({ hasText: /^C4$/ }) }).click()
+  await page.getByRole('combobox', { name: '音符谱表' }).selectOption('bass')
+  await expect(bass.locator('.score-note')).toHaveCount(2)
+  const project = await readProject(page)
+  expect(project.tracks[0].notes.map((note: { midi: number; onsetBeats: number }) => [note.midi, note.onsetBeats])).toEqual([[48, 0], [60, 1], [76, 2]])
+  expect(project.tracks[0].notes[1].staff).toBe('bass')
+  await page.getByRole('textbox', { name: '作品名称' }).fill('钢琴双谱表验收')
+  await page.reload()
+  await page.locator('.project-card').filter({ hasText: '钢琴双谱表验收' }).getByRole('button', { name: '打开作品 ↗' }).click()
+  await page.getByRole('button', { name: '生成总谱', exact: true }).click()
+  await expect(bass.locator('.score-note')).toHaveCount(2)
+  await expect(page.locator('.key-signature text')).toHaveCount(4)
+  await page.locator('.generated-score').screenshot({ path: 'test-results/piano-grand-staff.png' })
+  const pendingDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载总谱 SVG' }).click()
+  const download = await pendingDownload
+  const svg = await readFile((await download.path())!, 'utf8')
+  expect(svg).toContain('data-clef="treble"')
+  expect(svg).toContain('data-clef="bass"')
+  expect(svg).toContain('grand-staff-connector')
+})
 
 test('the continuous keyboard enters absolute pitches across octaves and scrolls on narrow screens', async ({ page }) => {
   await blank(page)

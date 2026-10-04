@@ -180,6 +180,7 @@ h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; letter-spacing: -.03em;
 .jianpu-rest { font: 22px Georgia, serif; color: #758ca6; white-space: nowrap; }
 .jianpu-rest small { display: block; font: 8px sans-serif; margin-top: 4px; }
 .keyboard-section { margin-top: 20px; padding: 16px; border-radius: 12px; background: #182536; min-width: 0; }
+.staff-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; color: #8fa7be; font-size: 11px; }
 .keyboard-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
 .keyboard-copy strong { font-size: 12px; }
 .keyboard-copy > span { font-size: 10px; color: #7f98b5; flex: 1; }

@@ -22,3 +22,9 @@
 [MuseScore 的局部拍号文档](https://handbook.musescore.org/notation/rhythm-meter-and-measures/time-signatures)说明其局部拍号采用与全局等长的小节。Sonora 按本项目需求保留共同的实际时间与各声部自己的小节边界，属于不同的实现取舍。
 
 多声部同一谱表的专业排版、力度与表情术语、连音组、反复与歌词仍属于后续记谱增强项；智能扒谱则是独立的下一阶段。
+
+## 钢琴双谱表与调号
+
+参照 [Open Music Theory：基本记谱](https://openmusictheory.github.io/basicNotation.html)和[大调与调号](https://viva.pressbooks.pub/openmusictheory/chapter/major-scales/)，钢琴显示由花括号连接的高音、低音双谱表。每个谱号后、拍号前分别排布调号；升号顺序为 F、C、G、D、A、E、B，降号顺序相反，并按各自谱号安排纵向位置。
+
+默认以书写音高的中央 C 为分界自动分配音符；这只是编辑便利规则，不代替钢琴左右手指法。用户可手动指定某个音符的高音或低音谱表。分谱前保留音符的绝对起音位置，两个谱表独立补休止符，手动换谱表不改变播放或 MIDI 音高。

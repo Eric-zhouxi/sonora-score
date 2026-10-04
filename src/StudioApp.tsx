@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { formatProjectDate, loadProjects, saveProjects } from './projectStore'
 import Timeline from './Timeline'
+import { keySignatureLabel, type Clef } from './staffLayout'
 import { GeneratedScore, Jianpu, ScoreSVG } from './Notation'
 import { clipRegions, keyInterval, moveClip, splitClip, transposeTrack } from './arrangement'
 import {
@@ -44,6 +45,7 @@ export default function StudioApp() {
   const [expandedKeyboard, setExpandedKeyboard] = useState(false)
   const [inputSpelling, setInputSpelling] = useState<AccidentalSpelling>('sharp')
   const [inputMode, setInputMode] = useState<'append' | 'cursor'>('append')
+  const [inputStaff, setInputStaff] = useState<Clef | 'auto'>('auto')
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
   const [targetKey, setTargetKey] = useState<KeySignature>('C')
@@ -126,7 +128,7 @@ export default function StudioApp() {
   function addNote(midi: number) {
     if (!currentTrack || !selectedClip || !project) return
     const start = inputMode === 'cursor' ? secondsToBeats(position, project.bpm) : selectedClip.endBeats
-    const note = { ...newNote(midi, inputDuration, isAccidental(midi) ? inputSpelling : undefined), onsetBeats: Math.max(selectedClip.startBeats, start), clipId: selectedClip.id }
+    const note = { ...newNote(midi, inputDuration, isAccidental(midi) ? inputSpelling : undefined), staff: currentTrack.instrument === 'piano' && inputStaff !== 'auto' ? inputStaff : undefined, onsetBeats: Math.max(selectedClip.startBeats, start), clipId: selectedClip.id }
     updateTrack(currentTrack.id, (track) => ({ ...track, notes: [...track.notes, note].sort((a, b) => (a.onsetBeats ?? 0) - (b.onsetBeats ?? 0)) }))
     setSelectedNoteId(note.id)
     if (inputMode === 'cursor') setPosition(beatsToSeconds(note.onsetBeats + durationToBeats(note.duration), project.bpm))
@@ -135,6 +137,7 @@ export default function StudioApp() {
   function selectNote(id: string) {
     setSelectedNoteId(id)
     const note = currentTrack?.notes.find((item) => item.id === id)
+    setInputStaff(note?.staff ?? 'auto')
     if (note?.clipId) setSelectedClipId(note.clipId)
   }
   function updateSelected(update: (note: NoteEvent) => NoteEvent) {
@@ -216,6 +219,7 @@ export default function StudioApp() {
         <div className="part-settings"><label>声部调号<select aria-label="声部调号" value={key} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, keySignature: event.target.value as KeySignature }))}>{KEY_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><label>声部拍号<select aria-label="声部拍号" value={meter} onChange={(event) => updateTrack(currentTrack.id, (track) => ({ ...track, timeSignature: event.target.value as TimeSignature }))}>{TIME_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><span className="settings-divider" /><label>移调到<select aria-label="移调目标调号" value={targetKey} onChange={(event) => setTargetKey(event.target.value as KeySignature)}>{KEY_SIGNATURES.map((value) => <option key={value}>{value}</option>)}</select></label><button onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, keyInterval(key, targetKey), targetKey)) }}>移调整个声部</button><button aria-label="声部降半音" onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, -1)) }}>− 半音</button><button aria-label="声部升半音" onClick={() => { stop(); updateTrack(currentTrack.id, (track) => transposeTrack(track, 1)) }}>＋ 半音</button></div>
         <p className="helper">设置调号只改变记谱；“移调整个声部”同时改变音高。当前声部拍号不影响其他音轨。</p>
         <div className="notation-tools">{durations.map((item) => <button key={item.value} title={item.label} aria-label={item.label} className={inputDuration === item.value ? 'active' : ''} onClick={() => applyDuration(item.value)}>{item.symbol}</button>)}<span /><button title="降号" onClick={() => applyAccidental('flat')} className={inputSpelling === 'flat' ? 'active' : ''}>♭</button><button title="还原号" onClick={() => applyAccidental('natural')}>♮</button><button title="升号" onClick={() => applyAccidental('sharp')} className={inputSpelling === 'sharp' ? 'active' : ''}>♯</button><button title="延音线" onClick={tieSelected}>⌒</button><button title="延音记号" onClick={() => updateSelected((note) => ({ ...note, fermata: !note.fermata }))}>𝄐</button><button title="音符降低半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.max(0, note.midi - 1), spelling: 'flat' }))}>−½</button><button title="音符升高半音" onClick={() => updateSelected((note) => ({ ...note, midi: Math.min(127, note.midi + 1), spelling: 'sharp' }))}>＋½</button><button title="删除选中音符，保留时间空档" disabled={!selectedNoteId} onClick={() => { updateTrack(currentTrack.id, (track) => ({ ...track, notes: track.notes.filter((note) => note.id !== selectedNoteId) })); setSelectedNoteId(null) }}>⌫</button><button onClick={() => setSelectedNoteId(null)} className="text-tool">取消选择 / 继续输入</button></div>
+        <div className="staff-controls"><span>谱号旁调号：{key} 大调 · {keySignatureLabel(key)}（在“声部调号”中设置）</span>{currentTrack.instrument === 'piano' && <label>音符谱表<select aria-label="音符谱表" value={selectedNoteId ? currentTrack.notes.find((note) => note.id === selectedNoteId)?.staff ?? 'auto' : inputStaff} onChange={(event) => { const staff = event.target.value as Clef | 'auto'; setInputStaff(staff); updateSelected((note) => ({ ...note, staff: staff === 'auto' ? undefined : staff })) }}><option value="auto">自动分配（中央 C 起为高音）</option><option value="treble">高音谱表 𝄞</option><option value="bass">低音谱表 𝄢</option></select></label>}</div>
         <div className="notation-scroll"><ScoreSVG project={project} tracks={[currentTrack]} selectedId={selectedNoteId} positionBeats={playing ? secondsToBeats(position, project.bpm) : undefined} onSelect={selectNote} endBeats={partEnd} /></div>
         <Jianpu project={project} track={currentTrack} selectedId={selectedNoteId} endBeats={partEnd} onSelect={selectNote} />
         <div className="keyboard-section">

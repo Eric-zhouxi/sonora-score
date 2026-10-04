@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { keyAlterations, scoreEvents, selectedScore, writtenPitch, type ScoreEvent } from './arrangement'
-import { beatsPerMeasure, defaultSpellingForKey, KEY_FIFTHS, midiToJianpu, midiToName, trackKey, trackMeter, type ProjectData, type Track } from './workspace'
+import { beatsPerMeasure, defaultSpellingForKey, midiToJianpu, midiToName, trackKey, trackMeter, type ProjectData, type Track } from './workspace'
+import { keySignatureMarks, trackForStaff, type Clef } from './staffLayout'
 
 function noteShape(beats: number) {
   const dotted = [0.375, 0.75, 1.5, 3, 6].some((value) => Math.abs(beats - value) < 0.0001)
@@ -15,19 +16,16 @@ function Rest({ event, x }: { event: ScoreEvent; x: number }) {
   </g>
 }
 
-function TrackStaff({ project, track, endBeats, selectedId, positionBeats, onSelect, startX, pxPerBeat, width }: { project: ProjectData; track: Track; endBeats: number; selectedId?: string | null; positionBeats?: number; onSelect?: (id: string) => void; startX: number; pxPerBeat: number; width: number }) {
+function TrackStaff({ project, track, clef, endBeats, selectedId, positionBeats, onSelect, startX, pxPerBeat, width }: { project: ProjectData; track: Track; clef: Clef; endBeats: number; selectedId?: string | null; positionBeats?: number; onSelect?: (id: string) => void; startX: number; pxPerBeat: number; width: number }) {
   const key = trackKey(track, project), meter = trackMeter(track, project), measure = beatsPerMeasure(meter)
-  const events = scoreEvents(track, meter, endBeats), [numerator, denominator] = meter.split('/')
-  const bass = track.instrument === 'cello', fifths = KEY_FIFTHS[key]
+  const events = scoreEvents(trackForStaff(track, clef, key), meter, endBeats), [numerator, denominator] = meter.split('/')
+  const bass = clef === 'bass'
   const accidentals = keyAlterations(key)
   let currentMeasure = -1, state: Record<string, number> = {}
-  const sharpY = [68, 86, 62, 80, 98, 74, 92], flatY = [92, 74, 98, 80, 104, 86, 110]
-  return <g>
-    <text x="28" y="25" className="part-label" fill={track.color}>{track.name}</text>
-    <text x="28" y="44" className="part-setting">{key} 大调 · {meter}</text>
+  return <g className="staff" data-clef={clef} aria-label={`${track.name}${bass ? '低音' : '高音'}谱表`}>
     {[68, 80, 92, 104, 116].map((y) => <line key={y} x1="28" x2={width - 24} y1={y} y2={y} className="score-line" />)}
     <text x="37" y={bass ? 107 : 113} className={bass ? 'score-clef bass' : 'score-clef'}>{bass ? '𝄢' : '𝄞'}</text>
-    {Array.from({ length: Math.abs(fifths) }, (_, index) => <text key={index} x={86 + index * 12} y={(fifths > 0 ? sharpY : flatY)[index] + (bass ? 12 : 0) + 5} className="score-accidental">{fifths > 0 ? '♯' : '♭'}</text>)}
+    <g className="key-signature" aria-label={`${key} 大调调号`}>{keySignatureMarks(key, clef).map((mark, index) => <text key={index} x={86 + index * 12} y={mark.y + 5} className="score-accidental">{mark.symbol}</text>)}</g>
     <text x={startX - 26} y="88" className="score-meter">{numerator}</text><text x={startX - 26} y="110" className="score-meter">{denominator}</text>
     {Array.from({ length: Math.floor(endBeats / measure) + 1 }, (_, index) => <g key={index}><line x1={startX + index * measure * pxPerBeat} x2={startX + index * measure * pxPerBeat} y1="68" y2="116" className="score-line" /><text x={startX + index * measure * pxPerBeat + 4} y="60" className="measure-caption">{index + 1}</text></g>)}
     {events.map((event) => {
@@ -66,12 +64,30 @@ export function ScoreSVG({ project, tracks, selectedId, positionBeats, onSelect,
   const score = selectedScore(project, tracks.map((track) => track.id))
   const endBeats = requestedEnd ?? score.endBeats
   const startX = 224, pxPerBeat = 72, width = Math.max(850, startX + endBeats * pxPerBeat + 50), header = tracks.length > 1 ? 65 : 0
-  const height = tracks.length * 218 + header
+  let nextY = header
+  const parts = tracks.map((track) => {
+    const y = nextY
+    nextY += track.instrument === 'piano' ? 398 : 218
+    return { track, y }
+  })
+  const height = nextY
   return <svg xmlns="http://www.w3.org/2000/svg" className="notation-svg" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={tracks.length > 1 ? '所选声部总谱' : `${tracks[0]?.name}五线谱`}>
     <style>{`.score-bg{fill:#151d2a}.notation-svg{color:#e3eaf4;font-family:"Segoe UI Symbol","Microsoft YaHei",sans-serif}.score-line{stroke:#56687e;stroke-width:1;fill:none}.score-clef{fill:#e3eaf4;font:60px "Segoe UI Symbol",serif}.score-clef.bass{font-size:45px}.part-label{font-size:16px;font-weight:700}.part-setting,.measure-caption{fill:#8f9fb4;font-size:10px}.score-meter{fill:#e3eaf4;font:bold 21px serif}.score-accidental{fill:#e3eaf4;font:22px "Segoe UI Symbol",serif}.score-rest{fill:#91a3ba;stroke:none}.rest-glyph{font:32px "Segoe UI Symbol",serif}.rest-caption{fill:#7487a0;font-size:9px}.score-note{fill:#e3eaf4;stroke:#e3eaf4;stroke-width:1.5;cursor:pointer}.score-note.selected,.score-note.playing{fill:#93d6ca;stroke:#93d6ca}.score-note .score-accidental{stroke:none}.score-flag{fill:none}.score-tie{fill:none;stroke-width:1.4}.score-fermata{stroke:none;fill:#e3eaf4;font:22px "Segoe UI Symbol",serif}.pitch-caption{stroke:none;fill:#8496af;font-size:9px}.score-title{fill:#e3eaf4;font-size:21px;font-weight:700}.score-subtitle{fill:#8496af;font-size:10px}`}</style>
     <rect className="score-bg" width={width} height={height} rx="12" />
     {tracks.length > 1 && <g><text x="28" y="30" className="score-title">{project.title}</text><text x="28" y="49" className="score-subtitle">♩ = {project.bpm} · {tracks.length} 个声部 · 时间对齐，保留独立调号与拍号</text></g>}
-    {tracks.map((track, i) => <g key={track.id} transform={`translate(0 ${header + i * 218})`}><TrackStaff project={project} track={track} endBeats={endBeats} selectedId={selectedId} positionBeats={positionBeats} onSelect={onSelect} startX={startX} pxPerBeat={pxPerBeat} width={width} /></g>)}
+    {parts.map(({ track, y }) => <g key={track.id} className="score-part" data-instrument={track.instrument} transform={`translate(0 ${y})`}>
+      <text x="28" y="25" className="part-label" fill={track.color}>{track.name}</text>
+      <text x="28" y="44" className="part-setting">{trackKey(track, project)} 大调 · {trackMeter(track, project)}</text>
+      {(track.instrument === 'piano' ? ['treble', 'bass'] as const : [track.instrument === 'cello' ? 'bass' : 'treble'] as const).map((clef, index) => <g key={clef} transform={`translate(0 ${index * 180})`}>
+        <TrackStaff project={project} track={track} clef={clef} endBeats={endBeats} selectedId={selectedId} positionBeats={positionBeats} onSelect={onSelect} startX={startX} pxPerBeat={pxPerBeat} width={width} />
+      </g>)}
+      {track.instrument === 'piano' && <g className="grand-staff-connector" aria-label="钢琴大谱表连接线" pointerEvents="none">
+        <path d="M 23 68 C 6 78 24 165 10 182 C 24 199 6 286 23 296" fill="none" stroke={track.color} strokeWidth="2.5" />
+        <line x1="28" x2="28" y1="68" y2="296" className="score-line" />
+        {Array.from({ length: Math.floor(endBeats / beatsPerMeasure(trackMeter(track, project))) + 1 }, (_, index) => <line key={index} x1={startX + index * beatsPerMeasure(trackMeter(track, project)) * pxPerBeat} x2={startX + index * beatsPerMeasure(trackMeter(track, project)) * pxPerBeat} y1="116" y2="248" className="score-line" />)}
+        <line x1={startX + endBeats * pxPerBeat} x2={startX + endBeats * pxPerBeat} y1="116" y2="248" className="score-line" />
+      </g>}
+    </g>)}
   </svg>
 }
 
