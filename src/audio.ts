@@ -2,10 +2,11 @@ import * as Tone from 'tone'
 import type { InstrumentId, NoteEvent, Track } from './music'
 import { durationToBeats, midiToName } from './music'
 
-let instruments: Record<InstrumentId, Tone.PolySynth> | undefined
+type Voice = Tone.PolySynth | Tone.Sampler
+let instruments: Record<InstrumentId, Voice> | undefined
+let instrumentsPromise: Promise<Record<InstrumentId, Voice>> | undefined
 
-function getInstruments() {
-  if (!instruments) {
+function syntheticInstruments(): Record<InstrumentId, Tone.PolySynth> {
     const piano = new Tone.PolySynth(Tone.FMSynth, {
       harmonicity: 2,
       modulationIndex: 3.5,
@@ -19,19 +20,39 @@ function getInstruments() {
       envelope: { attack: 0.12, decay: 0.2, sustain: 0.65, release: 0.8 },
     }).toDestination()
     violin.volume.value = -14
-    instruments = { piano, violin }
+    return { piano, violin }
+}
+
+async function getInstruments() {
+  if (instruments) return instruments
+  if (!instrumentsPromise) {
+    instrumentsPromise = (async () => {
+      try {
+        const sampleBaseUrl = `${import.meta.env.BASE_URL}samples/`
+        const piano = new Tone.Sampler({ urls: { A4: 'piano-a4.wav' }, baseUrl: sampleBaseUrl }).toDestination()
+        const violin = new Tone.Sampler({ urls: { A4: 'violin-a4.wav' }, baseUrl: sampleBaseUrl, attack: 0.04, release: 0.55 }).toDestination()
+        piano.volume.value = -5
+        violin.volume.value = -8
+        await Tone.loaded()
+        instruments = { piano, violin }
+      } catch {
+        instruments = syntheticInstruments()
+      }
+      return instruments
+    })()
   }
-  return instruments
+  return instrumentsPromise
 }
 
 export async function previewNote(instrument: InstrumentId, midi: number) {
   await Tone.start()
-  getInstruments()[instrument].triggerAttackRelease(midiToName(midi), '8n')
+  const voices = await getInstruments()
+  voices[instrument].triggerAttackRelease(midiToName(midi), '8n')
 }
 
 export async function playTracks(tracks: Track[], bpm: number, onStep: (index: number) => void) {
   await Tone.start()
-  const synths = getInstruments()
+  const synths = await getInstruments()
   const secondsPerBeat = 60 / bpm
   const startAt = Tone.now() + 0.08
   let longest = 0

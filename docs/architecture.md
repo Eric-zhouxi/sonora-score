@@ -25,15 +25,17 @@
 - [x] 基础节拍与音符时值
 - [x] MIDI 导入导出
 - [x] 本地工程持久化
-- [ ] 接入采样音色并记录许可证
+- [x] 接入 Iowa 钢琴/小提琴采样音色并记录来源、校验和与声明
 
 ### M1：钢琴单音与旋律
 
 - [x] 音频上传和波形预览
 - [x] 可运行的单音/和弦 DSP 基线 API
+- [x] C4–B4 钢琴/小提琴单音 smoke 模型与可复现训练
+- [x] 八条 Iowa 真实录音的最小域外评测
 - Basic Pitch 推理 API，返回标准化 NoteEvent
-- 单音合成集 + University of Iowa 真实样本评测
-- 指标：pitch accuracy、onset F1、note-with-offset F1
+- 扩展 University of Iowa 真实评测覆盖音域、力度和演奏法
+- 指标：pitch accuracy、instrument macro-F1、onset F1、note-with-offset F1
 
 ### M2：和弦与钢琴复音
 

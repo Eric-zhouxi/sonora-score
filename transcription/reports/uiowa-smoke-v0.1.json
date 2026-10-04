@@ -1,0 +1,81 @@
+{
+  "dataset": "uiowa-mis-reviewed-subset-v1",
+  "sampleCount": 8,
+  "instrumentAccuracy": 0.875,
+  "instrumentMacroF1": 0.873015873015873,
+  "pitchAccuracy": 1.0,
+  "samples": [
+    {
+      "id": "uiowa-piano-mf-a4",
+      "expectedInstrument": "piano",
+      "predictedInstrument": "piano",
+      "instrumentConfidence": 0.9996818966446555,
+      "expectedMidi": 69,
+      "predictedMidi": 69,
+      "pitchConfidence": 0.8000183879520262
+    },
+    {
+      "id": "uiowa-violin-arco-ff-a4",
+      "expectedInstrument": "violin",
+      "predictedInstrument": "violin",
+      "instrumentConfidence": 0.8604132777722764,
+      "expectedMidi": 69,
+      "predictedMidi": 69,
+      "pitchConfidence": 0.7998465430376833
+    },
+    {
+      "id": "uiowa-piano-mf-c4",
+      "expectedInstrument": "piano",
+      "predictedInstrument": "piano",
+      "instrumentConfidence": 0.9801192175193163,
+      "expectedMidi": 60,
+      "predictedMidi": 60,
+      "pitchConfidence": 0.87043292057748
+    },
+    {
+      "id": "uiowa-piano-mf-e4",
+      "expectedInstrument": "piano",
+      "predictedInstrument": "piano",
+      "instrumentConfidence": 0.9236111627175643,
+      "expectedMidi": 64,
+      "predictedMidi": 64,
+      "pitchConfidence": 0.790560025073371
+    },
+    {
+      "id": "uiowa-piano-mf-g4",
+      "expectedInstrument": "piano",
+      "predictedInstrument": "piano",
+      "instrumentConfidence": 0.9993566526373746,
+      "expectedMidi": 67,
+      "predictedMidi": 67,
+      "pitchConfidence": 0.769471425819739
+    },
+    {
+      "id": "uiowa-violin-arco-ff-c4",
+      "expectedInstrument": "violin",
+      "predictedInstrument": "violin",
+      "instrumentConfidence": 0.9999991738140368,
+      "expectedMidi": 60,
+      "predictedMidi": 60,
+      "pitchConfidence": 0.9018171197756146
+    },
+    {
+      "id": "uiowa-violin-arco-ff-e4",
+      "expectedInstrument": "violin",
+      "predictedInstrument": "violin",
+      "instrumentConfidence": 0.9637241557203231,
+      "expectedMidi": 64,
+      "predictedMidi": 64,
+      "pitchConfidence": 0.8188160517464445
+    },
+    {
+      "id": "uiowa-violin-arco-ff-g4",
+      "expectedInstrument": "violin",
+      "predictedInstrument": "piano",
+      "instrumentConfidence": 0.5662567100944423,
+      "expectedMidi": 67,
+      "predictedMidi": 67,
+      "pitchConfidence": 0.8170797588348251
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "trainExamples": 288,
+  "testExamples": 96,
+  "featureCount": 25,
+  "instrumentAccuracy": 1.0,
+  "instrumentMacroF1": 1.0,
+  "pitchAccuracy": 1.0,
+  "midiRange": [
+    60,
+    71
+  ],
+  "dataset": "synthetic-smoke-v1"
+}

@@ -12,6 +12,10 @@ dependencies = ["numpy>=1.26"]
 [project.scripts]
 sonora-analyze = "sonora_analysis.__main__:main"
 sonora-server = "sonora_analysis.server:main"
+sonora-train = "sonora_analysis.train:main"
+sonora-evaluate = "sonora_analysis.evaluate:main"
+sonora-fetch-samples = "sonora_analysis.samples:main"
+sonora-prepare-samples = "sonora_analysis.prepare_web_samples:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

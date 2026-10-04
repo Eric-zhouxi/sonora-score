@@ -64,18 +64,23 @@ class Analysis:
         }
 
 
-def _decode_pcm(raw: bytes, sample_width: int) -> np.ndarray:
+def _decode_pcm(raw: bytes, sample_width: int, byte_order: str = "little") -> np.ndarray:
     if sample_width == 1:
         return (np.frombuffer(raw, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
     if sample_width == 2:
-        return np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
+        dtype = "<i2" if byte_order == "little" else ">i2"
+        return np.frombuffer(raw, dtype=dtype).astype(np.float32) / 32768.0
     if sample_width == 3:
         packed = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
-        values = packed[:, 0].astype(np.int32) | (packed[:, 1].astype(np.int32) << 8) | (packed[:, 2].astype(np.int32) << 16)
+        if byte_order == "little":
+            values = packed[:, 0].astype(np.int32) | (packed[:, 1].astype(np.int32) << 8) | (packed[:, 2].astype(np.int32) << 16)
+        else:
+            values = packed[:, 2].astype(np.int32) | (packed[:, 1].astype(np.int32) << 8) | (packed[:, 0].astype(np.int32) << 16)
         values = np.where(values & 0x800000, values - 0x1000000, values)
         return values.astype(np.float32) / 8388608.0
     if sample_width == 4:
-        return np.frombuffer(raw, dtype="<i4").astype(np.float32) / 2147483648.0
+        dtype = "<i4" if byte_order == "little" else ">i4"
+        return np.frombuffer(raw, dtype=dtype).astype(np.float32) / 2147483648.0
     raise ValueError(f"unsupported PCM sample width: {sample_width}")
 
 
@@ -96,6 +101,22 @@ def read_wav_mono(source: str | Path | bytes | BinaryIO) -> tuple[np.ndarray, in
     if samples.size == 0:
         raise ValueError("WAV file contains no samples")
     return samples.astype(np.float32), sample_rate
+
+
+def read_audio_mono(source: str | Path | bytes | BinaryIO) -> tuple[np.ndarray, int]:
+    if isinstance(source, (str, Path)) and Path(source).suffix.lower() in {".aif", ".aiff", ".aifc"}:
+        import aifc
+
+        with aifc.open(str(source), "rb") as audio:
+            if audio.getcomptype() not in {b"NONE", "NONE"}:
+                raise ValueError("only uncompressed AIFF is supported")
+            channels = audio.getnchannels()
+            sample_rate = audio.getframerate()
+            samples = _decode_pcm(audio.readframes(audio.getnframes()), audio.getsampwidth(), "big")
+        if channels > 1:
+            samples = samples.reshape(-1, channels).mean(axis=1)
+        return samples.astype(np.float32), sample_rate
+    return read_wav_mono(source)
 
 
 def _frames(samples: np.ndarray, size: int, hop: int) -> list[tuple[int, np.ndarray]]:

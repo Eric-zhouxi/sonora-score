@@ -1,12 +1,152 @@
 {
   "schemaVersion": 1,
-  "samples": [],
+  "samples": [
+    {
+      "id": "uiowa-piano-mf-a4",
+      "sourceId": "uiowa-mis",
+      "instrument": "piano",
+      "midi": 69,
+      "note": "A4",
+      "dynamic": "mf",
+      "articulation": "natural",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS/Piano_Other/piano/Piano.mf.A4.aiff",
+      "fileName": "Piano.mf.A4.aiff",
+      "bytes": 5289358,
+      "sha256": "800a6be43a44125bda75f7907aba2f6299287b4060d67e85efcf32a226757563",
+      "webAsset": {
+        "path": "public/samples/piano-a4.wav",
+        "bytes": 123524,
+        "sha256": "8cbcb1f558a2be5bbd96ec6fcf118552e91b5f430ef91f52491dee45dda294a5"
+      }
+    },
+    {
+      "id": "uiowa-violin-arco-ff-a4",
+      "sourceId": "uiowa-mis",
+      "instrument": "violin",
+      "midi": 69,
+      "note": "A4",
+      "dynamic": "ff",
+      "articulation": "arco-sul-g",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Strings/Violin/Violin.arco.ff.sulG.A4.stereo.aif",
+      "fileName": "Violin.arco.ff.sulG.A4.stereo.aif",
+      "bytes": 987046,
+      "sha256": "56fad0a3c83469fe1fea0aa20cc8774e46db3d53c2de7125ebc37b88657005d4",
+      "webAsset": {
+        "path": "public/samples/violin-a4.wav",
+        "bytes": 88244,
+        "sha256": "a6b3790ed848095aeee8b18d06f19fbc81e886c417e17c105c13e89db32f7036"
+      }
+    },
+    {
+      "id": "uiowa-piano-mf-c4",
+      "sourceId": "uiowa-mis",
+      "instrument": "piano",
+      "midi": 60,
+      "note": "C4",
+      "dynamic": "mf",
+      "articulation": "natural",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS/Piano_Other/piano/Piano.mf.C4.aiff",
+      "fileName": "Piano.mf.C4.aiff",
+      "bytes": 5453058,
+      "sha256": "1a7d8ddea94a3639fa58d79ebcc0b09b170b9c324811d2b705f97e278fdefac2"
+    },
+    {
+      "id": "uiowa-piano-mf-e4",
+      "sourceId": "uiowa-mis",
+      "instrument": "piano",
+      "midi": 64,
+      "note": "E4",
+      "dynamic": "mf",
+      "articulation": "natural",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS/Piano_Other/piano/Piano.mf.E4.aiff",
+      "fileName": "Piano.mf.E4.aiff",
+      "bytes": 5141834,
+      "sha256": "3ee2ace7fd571c8868b3582b68417b1e456ef71169b136b732804d2f4eeabd9d"
+    },
+    {
+      "id": "uiowa-piano-mf-g4",
+      "sourceId": "uiowa-mis",
+      "instrument": "piano",
+      "midi": 67,
+      "note": "G4",
+      "dynamic": "mf",
+      "articulation": "natural",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS/Piano_Other/piano/Piano.mf.G4.aiff",
+      "fileName": "Piano.mf.G4.aiff",
+      "bytes": 5537038,
+      "sha256": "0bf10e0279d77cec93fe3c6cc47c53c4bab6b650e342b7c4badfa9bc11b9c3e3"
+    },
+    {
+      "id": "uiowa-violin-arco-ff-c4",
+      "sourceId": "uiowa-mis",
+      "instrument": "violin",
+      "midi": 60,
+      "note": "C4",
+      "dynamic": "ff",
+      "articulation": "arco-sul-g",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Strings/Violin/Violin.arco.ff.sulG.C4.stereo.aif",
+      "fileName": "Violin.arco.ff.sulG.C4.stereo.aif",
+      "bytes": 685828,
+      "sha256": "ca4984efa442a7c82293df46b444ef74dc5b0a94edb68e489d72257d38689a43"
+    },
+    {
+      "id": "uiowa-violin-arco-ff-e4",
+      "sourceId": "uiowa-mis",
+      "instrument": "violin",
+      "midi": 64,
+      "note": "E4",
+      "dynamic": "ff",
+      "articulation": "arco-sul-g",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Strings/Violin/Violin.arco.ff.sulG.E4.stereo.aif",
+      "fileName": "Violin.arco.ff.sulG.E4.stereo.aif",
+      "bytes": 620068,
+      "sha256": "4b56a423cc2962e78fc3274f37a4b8a8fe79635df0b3595340f199e98ab22ece"
+    },
+    {
+      "id": "uiowa-violin-arco-ff-g4",
+      "sourceId": "uiowa-mis",
+      "instrument": "violin",
+      "midi": 67,
+      "note": "G4",
+      "dynamic": "ff",
+      "articulation": "arco-sul-g",
+      "channels": 2,
+      "sampleRate": 44100,
+      "format": "aiff",
+      "url": "https://theremin.music.uiowa.edu/sound%20files/MIS%20Pitches%20-%202014/Strings/Violin/Violin.arco.ff.sulG.G4.stereo.aif",
+      "fileName": "Violin.arco.ff.sulG.G4.stereo.aif",
+      "bytes": 567034,
+      "sha256": "7fb8e5108f6000bf7a922832553e7b81dc3f0caa0b5c255300735a52c336e84a"
+    }
+  ],
   "sources": [
     {
       "id": "uiowa-mis",
       "name": "University of Iowa Musical Instrument Samples",
       "url": "https://theremin.music.uiowa.edu/MIS.html",
-      "licenseNote": "Provider states samples may be downloaded and used for any projects without restrictions; verify and preserve the source statement when importing files."
+      "licenseNote": "Provider states samples have been freely available since 1997 and may be downloaded and used for any projects, without restrictions.",
+      "accessedOn": "2026-10-04"
     }
   ]
 }

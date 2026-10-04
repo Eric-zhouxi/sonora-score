@@ -42,6 +42,8 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["notes"][0]["midi"], 69)
         self.assertTrue(payload["chords"])
+        self.assertIn(payload["instrument"]["label"], {"piano", "violin"})
+        self.assertEqual(payload["instrument"]["model"], "timbre-pitch-v0.1")
 
     def test_rejects_non_wav_content_type(self) -> None:
         status, payload = self.request("POST", "/v1/transcriptions", b"not audio", "audio/mpeg")

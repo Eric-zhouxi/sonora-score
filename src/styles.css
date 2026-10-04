@@ -118,7 +118,7 @@ footer { display: flex; justify-content: space-between; padding: 0 4vw 28px; col
 .result-heading { display: flex; justify-content: space-between; align-items: center; }
 .result-heading div { display: flex; flex-direction: column; gap: 4px; }.result-heading span { font: 600 15px "Noto Serif SC", serif; }.result-heading strong { color: #9a978f; font: 8px "DM Mono", monospace; }
 .result-heading button { padding: 9px 12px; border: 1px solid #d0cabf; background: #fffdf7; font-size: 10px; cursor: pointer; }
-.result-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 22px 0; background: #d8d3ca; }
+.result-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin: 22px 0; background: #d8d3ca; }
 .result-metrics div { display: flex; flex-direction: column; padding: 13px; background: #ebe7de; }.result-metrics strong { font: 500 20px "DM Mono", monospace; }.result-metrics span { margin-top: 4px; color: #8e8b84; font-size: 9px; }
 .piano-roll { display: flex; gap: 4px; overflow-x: auto; padding: 12px; min-height: 72px; align-items: center; background: #26313a; }
 .piano-roll > span { flex: 0 0 auto; padding: 8px 7px; border-radius: 2px; background: #d2a150; color: #26313a; font: 500 10px "DM Mono", monospace; }.piano-roll small { opacity: .66; }
@@ -134,5 +134,5 @@ footer { display: flex; justify-content: space-between; padding: 0 4vw 28px; col
   .track-panel { border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; overflow-x: auto; }
   .panel-title, .phase-card, .add-track { display: none; }.track-card { min-width: 180px; }
   .score-panel { padding: 14px; }.jianpu { padding-left: 24px; }.transport .tempo { display: none; }
-  .transcription-lab { margin: 20px 14px 28px; grid-template-columns: 1fr; gap: 16px; }.lab-intro { padding: 8px; }.lab-intro h2 { font-size: 29px; }.analysis-result { grid-column: 1; }
+  .transcription-lab { margin: 20px 14px 28px; grid-template-columns: 1fr; gap: 16px; }.lab-intro { padding: 8px; }.lab-intro h2 { font-size: 29px; }.analysis-result { grid-column: 1; }.result-metrics { grid-template-columns: repeat(2, 1fr); }
 }

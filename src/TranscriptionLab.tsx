@@ -22,6 +22,7 @@ interface AnalysisResult {
   durationSeconds: number
   notes: ApiNote[]
   chords: ApiChord[]
+  instrument?: { label: string; confidence: number; model: string } | null
 }
 
 function nearestDuration(seconds: number, bpm: number): Duration {
@@ -136,6 +137,7 @@ export default function TranscriptionLab({ bpm, onImport }: { bpm: number; onImp
             <div><strong>{result.durationSeconds.toFixed(1)}s</strong><span>音频时长</span></div>
             <div><strong>{result.notes.length}</strong><span>音符事件</span></div>
             <div><strong>{result.chords.length}</strong><span>和弦片段</span></div>
+            <div><strong>{result.instrument ? (result.instrument.label === 'piano' ? '钢琴' : '小提琴') : '—'}</strong><span>主乐器 {result.instrument ? `${Math.round(result.instrument.confidence * 100)}%` : '模型未加载'}</span></div>
           </div>
           <div className="piano-roll">
             {result.notes.slice(0, 32).map((note, index) => (

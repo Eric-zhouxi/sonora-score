@@ -10,6 +10,7 @@
 - 调整速度并播放多音轨作品
 - 导入、导出标准 MIDI 文件，并自动保存浏览器草稿
 - 上传 WAV、预览波形并调用本地基线识别音符与和弦
+- 使用已版本化的 v0.1 模型识别钢琴/小提琴主音色
 - 运行基础音乐映射测试
 
 ## 本地运行
@@ -36,11 +37,11 @@ npm run build
 4. 多乐器：先做音源分离，再分别转录并估计乐器类别。
 5. 人工修订闭环：用户修订结果回流为经授权的训练数据。
 
-转录服务现在已有可运行的 DSP 基线；安装与启动方式见 [`transcription/README.md`](transcription/README.md)。完整接口与数据策略见 [`docs/architecture.md`](docs/architecture.md)。
+转录服务现在已有可运行的 DSP 基线、单音训练流程、模型卡和真实样本 smoke test；安装与启动方式见 [`transcription/README.md`](transcription/README.md)。完整接口与数据策略见 [`docs/architecture.md`](docs/architecture.md)。
 
 ## 声源原则
 
-仓库不直接提交体积庞大的采样包。默认音色由 Tone.js 合成器提供；后续采样器优先接入 University of Iowa Musical Instrument Samples 等许可清晰的来源。任何下载的样本都必须把来源、许可、原始文件名和校验和写入 `assets/samples/manifest.json`。
+仓库不直接提交体积庞大的原始采样包。当前 Tone.js Sampler 使用两段经过裁剪、单声道化和重采样的 University of Iowa A4 钢琴/小提琴录音，并用自动移调覆盖当前键盘；加载失败时回退到合成器。原始 URL、许可声明、文件大小、源文件与衍生文件校验和均记录在 `assets/samples/manifest.json`。
 
 ## 许可
 

@@ -11,6 +11,8 @@ Content-Type: audio/wav
 
 响应返回音符事件、和弦时间轴及每项置信度。当前 `sonora-dsp-v0.1` 用 FFT 自相关估计单音音高，用 chroma 与 24 个大小调模板估计和弦。它的作用是建立可解释、可评测的端到端基线，不冒充最终模型。
 
+若 `transcription/models/timbre-pitch-v0.1.npz` 存在，API 还会返回钢琴/小提琴主乐器类别及置信度。
+
 ## 启动
 
 建议创建 Python 3.11 或 3.12 虚拟环境：
@@ -38,6 +40,39 @@ python -m sonora_analysis song.wav --pretty
 ```bash
 python -m unittest discover -s transcription/tests
 ```
+
+## 单音模型训练与真实样本评测
+
+下载经过审核的八条 Iowa 样本（钢琴/小提琴各四条，C4/E4/G4/A4）。音频进入忽略的本地缓存，仓库只保留 URL、标签、大小和 SHA-256：
+
+```bash
+python -m sonora_analysis.samples
+```
+
+把原始 AIFF 转为浏览器使用的 22.05 kHz/16-bit 单声道 WAV：
+
+```bash
+python -m sonora_analysis.prepare_web_samples
+```
+
+重新生成 C4–B4、钢琴/小提琴双任务模型：
+
+```bash
+python -m sonora_analysis.train
+```
+
+在真实样本上执行域外 smoke test：
+
+```bash
+python -m sonora_analysis.evaluate --output transcription/reports/uiowa-smoke-v0.1.json
+```
+
+已提交的 v0.1 结果：
+
+- 合成测试：96 条未见变体，乐器 accuracy / macro-F1 / 音高 accuracy 均为 1.0。
+- Iowa 测试：8 条真实钢琴/小提琴样本，乐器 accuracy 0.875、macro-F1 0.873，音高 accuracy 1.0。小提琴 G4 被误判为钢琴。
+
+第二项仍是单一来源、小规模 smoke test，只证明真实数据链路打通，不能用于声称模型已经泛化。限制和适用范围见 [`models/MODEL_CARD.md`](models/MODEL_CARD.md)。
 
 ## 后续模型后端
 

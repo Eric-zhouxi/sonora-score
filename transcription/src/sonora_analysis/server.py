@@ -3,10 +3,24 @@ from __future__ import annotations
 import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
-from .core import analyze_wav
+import numpy as np
+
+from .core import analyze_wav, read_wav_mono
+from .features import extract_features
+from .model import TimbrePitchModel
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "timbre-pitch-v0.1.npz"
+
+
+def load_instrument_model(path: str | Path = DEFAULT_MODEL_PATH) -> TimbrePitchModel | None:
+    model_path = Path(path)
+    return TimbrePitchModel.load(model_path) if model_path.exists() else None
+
+
+INSTRUMENT_MODEL = load_instrument_model()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -39,8 +53,22 @@ class Handler(BaseHTTPRequestHandler):
             self._json(415, {"error": "baseline engine accepts PCM WAV only"})
             return
         try:
-            analysis = analyze_wav(self.rfile.read(length))
-            self._json(200, analysis.to_dict())
+            body = self.rfile.read(length)
+            analysis = analyze_wav(body)
+            payload = analysis.to_dict()
+            if INSTRUMENT_MODEL is not None:
+                samples, sample_rate = read_wav_mono(body)
+                features = extract_features(samples, sample_rate)
+                instruments, _ = INSTRUMENT_MODEL.predict(features)
+                probabilities, _ = INSTRUMENT_MODEL.predict_proba(features)
+                payload["instrument"] = {
+                    "label": str(instruments[0]),
+                    "confidence": round(float(np.max(probabilities)), 4),
+                    "model": "timbre-pitch-v0.1",
+                }
+            else:
+                payload["instrument"] = None
+            self._json(200, payload)
         except (ValueError, EOFError) as error:
             self._json(422, {"error": str(error)})
 
