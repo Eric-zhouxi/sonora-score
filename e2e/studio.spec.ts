@@ -15,6 +15,52 @@ async function pianoNotes(page: Page) {
   await page.getByRole('button', { name: 'E4 3', exact: true }).click()
 }
 
+test('symbol demo is added once, shows every mark and plays all sections with real audio output', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.addInitScript(() => {
+    const peaks: number[] = []
+    ;(window as any).__demoAudioPeaks = peaks
+    const connect = AudioNode.prototype.connect
+    AudioNode.prototype.connect = function (...args: any[]) {
+      const target = args[0]
+      if (target instanceof AudioDestinationNode) {
+        const analyser = this.context.createAnalyser(), sink = this.context.createGain()
+        analyser.fftSize = 256; sink.gain.value = 0
+        Reflect.apply(connect, this, [analyser]); Reflect.apply(connect, analyser, [sink]); Reflect.apply(connect, sink, [target])
+        const samples = new Float32Array(analyser.fftSize)
+        setInterval(() => { analyser.getFloatTimeDomainData(samples); peaks.push(Math.max(...samples.map(Math.abs))) }, 100)
+      }
+      return Reflect.apply(connect, this, args)
+    }
+  })
+  await page.goto('/')
+  const card = page.locator('.project-card').filter({ hasText: 'Sonora 演示：全符号试奏' })
+  await expect(card).toHaveCount(1)
+  await page.reload()
+  await expect(card).toHaveCount(1)
+  await card.getByRole('button', { name: '打开作品 ↗' }).click()
+  await expect(page.getByRole('region', { name: '全符号试听导览' })).toBeVisible()
+  await page.getByRole('button', { name: '5.0s · 升降还原', exact: true }).click()
+  await expect(page.getByRole('spinbutton', { name: '当前位置秒数' })).toHaveValue('5')
+  await page.getByRole('button', { name: '回到开头', exact: true }).click()
+  await page.screenshot({ path: 'test-results/symbol-demo-timeline.png', fullPage: true })
+  await page.getByRole('button', { name: '生成总谱', exact: true }).click()
+  const score = page.locator('.generated-score')
+  await expect(score.locator('.staff')).toHaveCount(6)
+  for (const symbol of ['♯', '♭', '♮']) expect(await score.locator('.score-accidental').allTextContents()).toContain(symbol)
+  await expect(score.locator('.score-tie')).not.toHaveCount(0)
+  await expect(score.locator('.score-fermata')).toHaveCount(2)
+  await expect(score.locator('.score-rest')).not.toHaveCount(0)
+  await page.getByRole('button', { name: '从当前位置播放' }).click()
+  await expect(page.getByRole('button', { name: '停止播放' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Math.max(...(window as any).__demoAudioPeaks)), { timeout: 10000 }).toBeGreaterThan(.001)
+  await expect(page.getByRole('button', { name: '从当前位置播放' })).toBeVisible({ timeout: 32000 })
+  expect(errors).toEqual([])
+  const audibleSamples = await page.evaluate(() => (window as any).__demoAudioPeaks.filter((peak: number) => peak > .001).length)
+  expect(audibleSamples).toBeGreaterThan(50)
+})
+
 test('piano grand staff renders both key signatures and preserves manual staff assignment', async ({ page }) => {
   await blank(page)
   await page.getByRole('button', { name: '声部编辑', exact: true }).click()

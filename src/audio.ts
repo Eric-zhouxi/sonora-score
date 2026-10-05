@@ -1,6 +1,5 @@
 import * as Tone from 'tone'
 import type { InstrumentId, Track } from './workspace'
-import { midiToName } from './workspace'
 import { playbackEvents } from './playback'
 
 type Voice = Tone.PolySynth | Tone.Sampler
@@ -62,7 +61,7 @@ async function getInstruments() {
 export async function previewNote(instrument: InstrumentId, midi: number) {
   await Tone.start()
   const voices = await getInstruments()
-  voices[instrument].triggerAttackRelease(midiToName(midi), '8n')
+  voices[instrument].triggerAttackRelease(Tone.Frequency(midi, 'midi').toFrequency(), '8n')
 }
 
 let scheduleIds: number[] = []
@@ -91,7 +90,7 @@ export async function playTracks(
     const duration = event.durationBeats * secondsPerBeat
     endSeconds = Math.max(endSeconds, onset + duration)
     scheduleIds.push(transport.scheduleOnce((time) => {
-      voices[event.instrument].triggerAttackRelease(midiToName(event.midi), duration * 0.98, time, event.velocity)
+      voices[event.instrument].triggerAttackRelease(Tone.Frequency(event.midi, 'midi').toFrequency(), duration * 0.98, time, event.velocity)
       Tone.getDraw().schedule(() => onStep(index), time)
     }, onset))
   }

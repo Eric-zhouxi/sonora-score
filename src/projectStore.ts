@@ -1,4 +1,5 @@
 import { createExampleProject, parseProject, type ProjectData } from './workspace'
+import { withSymbolDemo } from './symbolDemo'
 
 const LIBRARY_KEY = 'sonora.library.v1'
 const LEGACY_KEY = 'sonora.project'
@@ -9,7 +10,7 @@ export function loadProjects(): ProjectData[] {
     if (raw) {
       const parsed = JSON.parse(raw) as unknown[]
       const projects = parsed.map((project) => parseProject(JSON.stringify(project))).filter((project): project is ProjectData => Boolean(project))
-      if (projects.length) return projects
+      if (projects.length) return withSymbolDemo(projects)
     }
   } catch {
     // Fall through to legacy migration.
@@ -17,7 +18,7 @@ export function loadProjects(): ProjectData[] {
 
   const legacy = parseProject(localStorage.getItem(LEGACY_KEY))
   const example = createExampleProject()
-  return legacy ? [{ ...legacy, title: '迁移的旧草稿' }, example] : [example]
+  return withSymbolDemo(legacy ? [{ ...legacy, title: '迁移的旧草稿' }, example] : [example])
 }
 
 export function saveProjects(projects: ProjectData[]): void {
