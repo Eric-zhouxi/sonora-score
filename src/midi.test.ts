@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { midiToProject, projectToMidi } from './midi'
 import { newNote, starterTracks, type Track } from './workspace'
+import { newTrack, createProject, parseProject } from './workspace'
+import { Midi } from '@tonejs/midi'
+import { transposeTrack } from './arrangement'
 
 describe('MIDI round trip', () => {
+  it('keeps guitar/bass programs and drum note numbers on channel 10', () => {
+    const tracks = (['guitar', 'electricGuitar', 'bass', 'drums'] as const).map((instrument) => ({ ...newTrack(instrument), notes: (instrument === 'drums' ? [36, 38, 42, 46, 49, 51] : [40, 52, 64]).map((midi, index) => ({ ...newNote(midi, .125), onsetBeats: index / 2 })) }))
+    const bytes = projectToMidi(tracks, 104), midi = new Midi(bytes)
+    expect(midi.tracks.map((track) => track.instrument.number)).toEqual([25, 27, 33, 0])
+    expect(midi.tracks.map((track) => track.channel)).toEqual([0, 1, 2, 9])
+    const restored = midiToProject(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
+    expect(restored.tracks.map((track) => track.instrument)).toEqual(['guitar', 'electricGuitar', 'bass', 'drums'])
+    expect(restored.tracks[3].notes.map((note) => note.midi)).toEqual([36, 38, 42, 46, 49, 51])
+    expect(parseProject(JSON.stringify(createProject(104, tracks)))?.tracks.map((track) => track.instrument)).toEqual(['guitar', 'electricGuitar', 'bass', 'drums'])
+    expect(transposeTrack(tracks[3], 12)).toBe(tracks[3])
+  })
   it('preserves tempo, tracks, pitches and durations', () => {
     const bytes = projectToMidi(starterTracks, 108)
     const result = midiToProject(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)

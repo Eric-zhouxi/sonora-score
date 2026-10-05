@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { keyAlterations, scoreEvents, selectedScore, writtenPitch, type ScoreEvent } from './arrangement'
 import { beatsPerMeasure, defaultSpellingForKey, midiToJianpu, midiToName, trackKey, trackMeter, type ProjectData, type Track } from './workspace'
 import { keySignatureMarks, trackForStaff, type Clef } from './staffLayout'
+import { drumInfo, drumName } from './instruments'
 
 function noteShape(beats: number) {
   const dotted = [0.375, 0.75, 1.5, 3, 6].some((value) => Math.abs(beats - value) < 0.0001)
@@ -20,12 +21,15 @@ function TrackStaff({ project, track, clef, endBeats, selectedId, positionBeats,
   const key = trackKey(track, project), meter = trackMeter(track, project), measure = beatsPerMeasure(meter)
   const events = scoreEvents(trackForStaff(track, clef, key), meter, endBeats), [numerator, denominator] = meter.split('/')
   const bass = clef === 'bass'
+  const percussion = clef === 'percussion'
+  const octaveDown = ['guitar', 'electricGuitar', 'bass'].includes(track.instrument)
   const accidentals = keyAlterations(key)
   let currentMeasure = -1, state: Record<string, number> = {}
-  return <g className="staff" data-clef={clef} aria-label={`${track.name}${bass ? '低音' : '高音'}谱表`}>
+  return <g className="staff" data-clef={clef} aria-label={`${track.name}${percussion ? '打击乐' : bass ? '低音' : '高音'}谱表`}>
     {[68, 80, 92, 104, 116].map((y) => <line key={y} x1="28" x2={width - 24} y1={y} y2={y} className="score-line" />)}
-    <text x="37" y={bass ? 107 : 113} className={bass ? 'score-clef bass' : 'score-clef'}>{bass ? '𝄢' : '𝄞'}</text>
-    <g className="key-signature" aria-label={`${key} 大调调号`}>{keySignatureMarks(key, clef).map((mark, index) => <text key={index} x={86 + index * 12} y={mark.y + 5} className="score-accidental">{mark.symbol}</text>)}</g>
+    {percussion ? <g className="percussion-clef" aria-label="打击乐谱号" fill="#e3eaf4"><rect x="43" y="80" width="5" height="24" /><rect x="55" y="80" width="5" height="24" /></g> : <text x="37" y={bass ? 107 : 113} className={bass ? 'score-clef bass' : 'score-clef'}>{bass ? '𝄢' : '𝄞'}</text>}
+    {octaveDown && <text x="52" y="135" className="measure-caption">8</text>}
+    {!percussion && <g className="key-signature" aria-label={`${key} 大调调号`}>{keySignatureMarks(key, clef).map((mark, index) => <text key={index} x={86 + index * 12} y={mark.y + 5} className="score-accidental">{mark.symbol}</text>)}</g>}
     <text x={startX - 26} y="88" className="score-meter">{numerator}</text><text x={startX - 26} y="110" className="score-meter">{denominator}</text>
     {Array.from({ length: Math.floor(endBeats / measure) + 1 }, (_, index) => <g key={index}><line x1={startX + index * measure * pxPerBeat} x2={startX + index * measure * pxPerBeat} y1="68" y2="116" className="score-line" /><text x={startX + index * measure * pxPerBeat + 4} y="60" className="measure-caption">{index + 1}</text></g>)}
     {events.map((event) => {
@@ -35,28 +39,32 @@ function TrackStaff({ project, track, clef, endBeats, selectedId, positionBeats,
       if (event.measure !== currentMeasure) { currentMeasure = event.measure; state = { ...accidentals } }
       const stateKey = `${pitch.letter}${pitch.octave}`
       const previousAlter = state[stateKey] ?? accidentals[pitch.letter]
-      const accidental = pitch.alter !== previousAlter && !event.tieIn ? pitch.alter > 0 ? '♯' : pitch.alter < 0 ? '♭' : '♮' : null
+      const accidental = !percussion && pitch.alter !== previousAlter && !event.tieIn ? pitch.alter > 0 ? '♯' : pitch.alter < 0 ? '♭' : '♮' : null
       state[stateKey] = pitch.alter
-      const y = (bass ? 98 : 128) - ((pitch.octave - (bass ? 3 : 4)) * 7 + pitch.degree) * 6
+      const drum = percussion ? drumInfo(note.midi) : undefined
+      const y = percussion ? drum?.y ?? 92 : (bass ? 98 : 128) - ((pitch.octave + (octaveDown ? 1 : 0) - (bass ? 3 : 4)) * 7 + pitch.degree) * 6
       const shape = noteShape(event.durationBeats), down = y < 92
       const active = positionBeats !== undefined && positionBeats >= event.onsetBeats && positionBeats < event.onsetBeats + event.durationBeats
-      const ledgerYs = y >= 128 ? Array.from({ length: Math.floor((y - 128) / 12) + 1 }, (_, i) => 128 + i * 12) : y <= 56 ? Array.from({ length: Math.floor((56 - y) / 12) + 1 }, (_, i) => 56 - i * 12) : []
+      const ledgerYs = percussion ? [] : y >= 128 ? Array.from({ length: Math.floor((y - 128) / 12) + 1 }, (_, i) => 128 + i * 12) : y <= 56 ? Array.from({ length: Math.floor((56 - y) / 12) + 1 }, (_, i) => 56 - i * 12) : []
       const next = events.find((candidate) => candidate.kind === 'note' && candidate.onsetBeats >= event.onsetBeats + event.durationBeats - 0.0001 && candidate.note?.midi === note.midi)
       const tieEnd = next && Math.abs(next.onsetBeats - event.onsetBeats - event.durationBeats) < 0.0001 ? startX + 19 + next.onsetBeats * pxPerBeat : null
-      return <g key={event.id} className={`score-note ${selectedId === note.id ? 'selected' : ''} ${active ? 'playing' : ''}`} tabIndex={onSelect ? 0 : undefined} role={onSelect ? 'button' : undefined} aria-label={`${midiToName(note.midi, note.spelling ?? defaultSpellingForKey(key))}，${event.durationBeats} 拍`} onClick={() => onSelect?.(note.id)} onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(note.id) }}>
-        {onSelect && <rect x={x - 16} y={Math.min(54, y - 39)} width="32" height={198 - Math.min(54, y - 39)} fill="transparent" stroke="none" pointerEvents="all" />}
+      return <g key={event.id} className={`score-note ${selectedId === note.id ? 'selected' : ''} ${active ? 'playing' : ''}`} tabIndex={onSelect ? 0 : undefined} role={onSelect ? 'button' : undefined} aria-label={`${percussion ? drumName(note.midi) : midiToName(note.midi, note.spelling ?? defaultSpellingForKey(key))}，${event.durationBeats} 拍`} onClick={() => onSelect?.(note.id)} onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(note.id) }}>
+        {onSelect && <rect x={x - 16} y={percussion ? y - 12 : Math.min(54, y - 39)} width="32" height={percussion ? 24 : 198 - Math.min(54, y - 39)} fill="transparent" stroke="none" pointerEvents="all" />}
+        {percussion && <title>{drumName(note.midi)}</title>}
         {ledgerYs.map((lineY) => <line key={lineY} x1={x - 13} x2={x + 14} y1={lineY} y2={lineY} className="score-line" />)}
         {accidental && <text x={x - 21} y={y + 6} className="score-accidental">{accidental}</text>}
-        <ellipse cx={x} cy={y} rx="8" ry="5.5" transform={`rotate(-18 ${x} ${y})`} fill={shape.value >= 2 ? 'transparent' : undefined} />
+        {drum?.cross ? <path className="drum-cross" d={`M ${x - 5} ${y - 5} l 10 10 M ${x - 5} ${y + 5} l 10 -10`} fill="none" /> : <ellipse cx={x} cy={y} rx="8" ry="5.5" transform={`rotate(-18 ${x} ${y})`} fill={shape.value >= 2 ? 'transparent' : undefined} />}
+        {drum?.midi === 46 && <circle cx={x} cy={y - 13} r="4" fill="none" />}
         {shape.value < 4 && <line x1={x + (down ? -7 : 7)} x2={x + (down ? -7 : 7)} y1={y} y2={y + (down ? 34 : -34)} />}
         {shape.value < 1 && Array.from({ length: shape.value < 0.5 ? 2 : 1 }, (_, i) => <path key={i} d={down ? `M ${x - 7} ${y + 34 - i * 7} q -15 -8 -5 -20` : `M ${x + 7} ${y - 34 + i * 7} q 15 8 5 20`} className="score-flag" />)}
         {shape.dotted && <circle cx={x + 14} cy={y - 3} r="2" />}
         {event.tieOut && tieEnd && <path d={`M ${x + 2} ${y + 11} Q ${(x + tieEnd) / 2} ${y + 28} ${tieEnd - 2} ${y + 11}`} className="score-tie" />}
         {note.fermata && !event.tieOut && <text x={x} y={Math.min(54, y - 40)} textAnchor="middle" className="score-fermata">𝄐</text>}
-        <text x={x} y="190" textAnchor="middle" className="pitch-caption">{pitch.letter}{pitch.alter > 0 ? '♯' : pitch.alter < 0 ? '♭' : ''}{pitch.octave}</text>
+        {!percussion && <text x={x} y="190" textAnchor="middle" className="pitch-caption">{`${pitch.letter}${pitch.alter > 0 ? '♯' : pitch.alter < 0 ? '♭' : ''}${pitch.octave}`}</text>}
       </g>
     })}
     <line x1={startX + endBeats * pxPerBeat} x2={startX + endBeats * pxPerBeat} y1="68" y2="116" className="score-line" />
+    {percussion && <text x="28" y="190" className="pitch-caption">● 底鼓 / 军鼓 / 通鼓　 × 踩镲 / 镲片　 ○ 开放踩镲（悬停或选择音符查看鼓件名）</text>}
   </g>
 }
 
@@ -77,8 +85,8 @@ export function ScoreSVG({ project, tracks, selectedId, positionBeats, onSelect,
     {tracks.length > 1 && <g><text x="28" y="30" className="score-title">{project.title}</text><text x="28" y="49" className="score-subtitle">♩ = {project.bpm} · {tracks.length} 个声部 · 时间对齐，保留独立调号与拍号</text></g>}
     {parts.map(({ track, y }) => <g key={track.id} className="score-part" data-instrument={track.instrument} transform={`translate(0 ${y})`}>
       <text x="28" y="25" className="part-label" fill={track.color}>{track.name}</text>
-      <text x="28" y="44" className="part-setting">{trackKey(track, project)} 大调 · {trackMeter(track, project)}</text>
-      {(track.instrument === 'piano' ? ['treble', 'bass'] as const : [track.instrument === 'cello' ? 'bass' : 'treble'] as const).map((clef, index) => <g key={clef} transform={`translate(0 ${index * 180})`}>
+      <text x="28" y="44" className="part-setting">{track.instrument === 'drums' ? '打击乐' : `${trackKey(track, project)} 大调`} · {trackMeter(track, project)}</text>
+      {(track.instrument === 'piano' ? ['treble', 'bass'] as const : [track.instrument === 'drums' ? 'percussion' : ['cello', 'bass'].includes(track.instrument) ? 'bass' : 'treble'] as const).map((clef, index) => <g key={clef} transform={`translate(0 ${index * 180})`}>
         <TrackStaff project={project} track={track} clef={clef} endBeats={endBeats} selectedId={selectedId} positionBeats={positionBeats} onSelect={onSelect} startX={startX} pxPerBeat={pxPerBeat} width={width} />
       </g>)}
       {track.instrument === 'piano' && <g className="grand-staff-connector" aria-label="钢琴大谱表连接线" pointerEvents="none">

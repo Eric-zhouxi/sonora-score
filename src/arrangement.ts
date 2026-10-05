@@ -38,6 +38,7 @@ export function splitClip(track: Track, noteId: string): { track: Track; clipId:
 }
 
 export function transposeTrack(track: Track, semitones: number, targetKey?: KeySignature): Track {
+  if (track.instrument === 'drums') return track
   // Shift the entire part by a single interval; never clamp individual notes and change the harmony.
   const min = Math.min(...track.notes.map((note) => note.midi), 108)
   const max = Math.max(...track.notes.map((note) => note.midi), 0)

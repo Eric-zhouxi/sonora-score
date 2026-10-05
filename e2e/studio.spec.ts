@@ -15,6 +15,69 @@ async function pianoNotes(page: Page) {
   await page.getByRole('button', { name: 'E4 3', exact: true }).click()
 }
 
+test('expanded instrument library plays decoded guitar bass and drums, and saves percussion notation', async ({ page }) => {
+  const errors: string[] = [], assets = new Set<string>()
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('response', (response) => { if (response.status() === 200 && /samples\/(guitar-|bass-|drum-)/.test(response.url())) assets.add(response.url()) })
+  await page.addInitScript(() => {
+    ;(window as any).__decodedSamples = 0
+    ;(window as any).__samplePeak = 0
+    const decode = BaseAudioContext.prototype.decodeAudioData
+    BaseAudioContext.prototype.decodeAudioData = function (...args: any[]) {
+      const result = Reflect.apply(decode, this, args)
+      result.then((buffer: AudioBuffer) => {
+        ;(window as any).__decodedSamples++
+        const data = buffer.getChannelData(0)
+        for (const value of data) (window as any).__samplePeak = Math.max((window as any).__samplePeak, Math.abs(value))
+      })
+      return result
+    }
+  })
+  await page.goto('/')
+  await page.locator('.project-card').filter({ hasText: 'Sonora 演示：吉他与鼓' }).getByRole('button', { name: '打开作品 ↗' }).click()
+  for (const name of ['木吉他', '电吉他', '电贝斯', '电子鼓组']) await expect(page.getByRole('button', { name: `＋ ${name}`, exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '从当前位置播放' }).click()
+  await expect(page.getByRole('button', { name: '停止播放' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => (window as any).__decodedSamples)).toBeGreaterThanOrEqual(18)
+  expect(await page.evaluate(() => (window as any).__samplePeak)).toBeGreaterThan(.01)
+  expect(assets.size).toBe(18)
+  await expect(page.getByRole('button', { name: '从当前位置播放' })).toBeVisible({ timeout: 15000 })
+  const drumTrack = page.locator('.track-card').filter({ has: page.getByRole('textbox', { name: '电子鼓组名称', exact: true }) })
+  await drumTrack.dblclick()
+  await expect(page.getByRole('region', { name: '电子鼓垫' }).getByRole('button')).toHaveCount(9)
+  await expect(page.getByRole('combobox', { name: '声部调号', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '移调整个声部' })).toBeDisabled()
+  await expect(page.locator('.staff[data-clef="percussion"]')).toHaveCount(1)
+  await expect(page.locator('.key-signature')).toHaveCount(0)
+  await expect(page.locator('.drum-cross')).not.toHaveCount(0)
+  for (const name of ['底鼓', '军鼓', '闭合踩镲', '开放踩镲', '低通鼓', '中通鼓', '高通鼓', '碎音镲', '叮叮镲']) await page.getByRole('button', { name: `输入${name}`, exact: true }).click()
+  await page.screenshot({ path: 'test-results/expanded-instruments.png', fullPage: true })
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sonora.library.v1')!).find((project: { id: string }) => project.id === 'sonora-band-demo-v1'))
+  expect(stored.tracks[3].notes.slice(-9).map((note: { midi: number }) => note.midi)).toEqual([36, 38, 42, 46, 41, 45, 48, 49, 51])
+  await page.getByRole('button', { name: '生成总谱', exact: true }).click()
+  await expect(page.locator('.staff[data-clef="bass"]')).toHaveCount(1)
+  await expect(page.locator('.percussion-clef')).toHaveCount(1)
+  await page.getByRole('button', { name: '＋ 电贝斯', exact: true }).click()
+  await page.getByRole('button', { name: '声部编辑', exact: true }).click()
+  await page.getByRole('button', { name: 'E1 3', exact: true }).click()
+  const bassPitch = await page.evaluate(() => JSON.parse(localStorage.getItem('sonora.library.v1')!).find((project: { id: string }) => project.id === 'sonora-band-demo-v1').tracks.at(-1).notes[0].midi)
+  expect(bassPitch).toBe(28)
+  expect(errors).toEqual([])
+})
+
+test('missing drum samples fall back without errors on simultaneous kick snare and hi-hat', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.route('**/samples/drum-*.wav', (route) => route.abort())
+  await page.goto('/')
+  await page.locator('.project-card').filter({ hasText: 'Sonora 演示：吉他与鼓' }).getByRole('button', { name: '打开作品 ↗' }).click()
+  await page.getByRole('spinbutton', { name: '速度 BPM' }).fill('240')
+  await page.getByRole('button', { name: '从当前位置播放' }).click()
+  await expect(page.getByRole('button', { name: '停止播放' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '从当前位置播放' })).toBeVisible({ timeout: 10000 })
+  expect(errors).toEqual([])
+})
+
 test('symbol demo is added once, shows every mark and plays all sections with real audio output', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))

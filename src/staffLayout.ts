@@ -1,7 +1,7 @@
 import { writtenPitch } from './arrangement'
 import { KEY_FIFTHS, noteOnsets, type KeySignature, type NoteEvent, type Track } from './workspace'
 
-export type Clef = 'treble' | 'bass'
+export type Clef = 'treble' | 'bass' | 'percussion'
 
 export function pianoStaff(note: NoteEvent, key: KeySignature): Clef {
   if (note.staff === 'treble' || note.staff === 'bass') return note.staff
@@ -16,6 +16,7 @@ export function trackForStaff(track: Track, clef: Clef, key: KeySignature): Trac
 }
 
 export function keySignatureMarks(key: KeySignature, clef: Clef) {
+  if (clef === 'percussion') return []
   const fifths = KEY_FIFTHS[key]
   const positions = fifths > 0 ? [68, 86, 62, 80, 98, 74, 92] : [92, 74, 98, 80, 104, 86, 110]
   return positions.slice(0, Math.abs(fifths)).map((y) => ({ symbol: fifths > 0 ? '♯' : '♭', y: y + (clef === 'bass' ? 12 : 0) }))

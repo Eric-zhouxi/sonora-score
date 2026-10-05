@@ -1,8 +1,8 @@
 import { Midi } from '@tonejs/midi'
 import { durationToBeats, newNote, newTrack, normalizeTrack, noteOnsets, TRACK_COLORS, type Duration, type InstrumentId, type Track } from './workspace'
+import { INSTRUMENTS } from './instruments'
 
 const supportedDurations: Duration[] = [0.0625, 0.125, 0.25, 0.5, 1, 2]
-const midiPrograms: Record<InstrumentId, number> = { piano: 0, violin: 40, cello: 42, flute: 73 }
 
 function closestDuration(beats: number): Duration {
   return supportedDurations.reduce((closest, duration) =>
@@ -13,10 +13,16 @@ function closestDuration(beats: number): Duration {
 export function projectToMidi(tracks: Track[], bpm: number): Uint8Array {
   const midi = new Midi()
   midi.header.setTempo(bpm)
+  const channels = new Map<InstrumentId, number>()
   tracks.forEach((source) => {
     const target = midi.addTrack()
     target.name = source.name
-    target.instrument.number = midiPrograms[source.instrument]
+    if (source.instrument !== 'drums' && !channels.has(source.instrument)) {
+      const channel = channels.size
+      channels.set(source.instrument, channel >= 9 ? channel + 1 : channel)
+    }
+    target.channel = source.instrument === 'drums' ? 9 : channels.get(source.instrument)!
+    target.instrument.number = INSTRUMENTS[source.instrument].program
     const onsets = noteOnsets(source.notes)
     source.notes.forEach((note, index) => {
       const durationTicks = durationToBeats(note.duration)
@@ -32,11 +38,11 @@ export function midiToProject(bytes: ArrayBuffer): { bpm: number; tracks: Track[
   const imported = midi.tracks.filter((track) => track.notes.length > 0)
   const tracks = imported.map((track, index): Track => {
     const program = track.instrument.number
-    const instrument: InstrumentId = program === 42 ? 'cello' : program === 73 ? 'flute' : program >= 40 && program <= 47 ? 'violin' : 'piano'
+    const instrument: InstrumentId = track.channel === 9 ? 'drums' : program >= 24 && program <= 26 ? 'guitar' : program >= 27 && program <= 31 ? 'electricGuitar' : program >= 32 && program <= 39 ? 'bass' : program === 42 ? 'cello' : program === 73 ? 'flute' : program >= 40 && program <= 47 ? 'violin' : 'piano'
     return normalizeTrack({
       ...newTrack(instrument),
       color: TRACK_COLORS[index % TRACK_COLORS.length],
-      name: track.name || `导入${instrument === 'piano' ? '钢琴' : instrument === 'violin' ? '小提琴' : instrument === 'cello' ? '大提琴' : '长笛'}`,
+      name: track.name || `导入${INSTRUMENTS[instrument].name}`,
       muted: false,
       notes: [...track.notes]
         .sort((a, b) => a.ticks - b.ticks)

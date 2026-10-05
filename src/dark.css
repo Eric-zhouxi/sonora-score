@@ -186,6 +186,10 @@ h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; letter-spacing: -.03em;
 .demo-guide p { font-size: 12px; line-height: 1.8; color: #a1b5c6; }
 .demo-guide > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .demo-guide button { font-size: 11px; }
+.drum-pads { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.drum-pads button { display: flex; flex-direction: column; gap: 12px; padding: 20px 12px; background: #28374d; border-bottom: 4px solid #a799d5; }
+.drum-pads button:active { background: #566080; }
+.drum-pads small { color: #9fb1c4; font: 10px monospace; }
 .keyboard-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
 .keyboard-copy strong { font-size: 12px; }
 .keyboard-copy > span { font-size: 10px; color: #7f98b5; flex: 1; }

@@ -1,4 +1,5 @@
-export type InstrumentId = 'piano' | 'violin' | 'cello' | 'flute'
+import { INSTRUMENTS, INSTRUMENT_IDS, type InstrumentId } from './instruments'
+export type { InstrumentId } from './instruments'
 export type Duration = 0.0625 | 0.125 | 0.25 | 0.5 | 1 | 2
 export type AccidentalSpelling = 'sharp' | 'flat'
 export const KEY_SIGNATURES = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭'] as const
@@ -107,8 +108,8 @@ export function newNote(midi: number, duration: Duration, spelling?: AccidentalS
 }
 export function newTrack(instrument: InstrumentId, existing: Track[] = []): Track {
   const count = existing.filter((track) => track.instrument === instrument).length + 1
-  const names = { piano: count === 1 ? '钢琴' : `钢琴 ${count}`, violin: count === 1 ? '第一小提琴' : count === 2 ? '第二小提琴' : `小提琴 ${count}`, cello: count === 1 ? '大提琴' : `大提琴 ${count}`, flute: count === 1 ? '长笛' : `长笛 ${count}` }
-  return { id: makeId(instrument), instrument, name: names[instrument], color: TRACK_COLORS[existing.length % TRACK_COLORS.length], muted: false, notes: [], keySignature: 'C', timeSignature: '4/4', clips: [{ id: makeId('clip'), name: '片段 1', startBeats: 0 }] }
+  const name = instrument === 'violin' ? count === 1 ? '第一小提琴' : count === 2 ? '第二小提琴' : `小提琴 ${count}` : `${INSTRUMENTS[instrument].name}${count > 1 ? ` ${count}` : ''}`
+  return { id: makeId(instrument), instrument, name, color: TRACK_COLORS[existing.length % TRACK_COLORS.length], muted: false, notes: [], keySignature: 'C', timeSignature: '4/4', clips: [{ id: makeId('clip'), name: '片段 1', startBeats: 0 }] }
 }
 export function normalizeTrack(track: Track, index: number, key: KeySignature = 'C', meter: TimeSignature = '4/4'): Track {
   const onsets = noteOnsets(track.notes)
@@ -142,7 +143,7 @@ export function parseProject(value: string | null): ProjectData | null {
     const meter = TIME_SIGNATURES.includes(raw.timeSignature as TimeSignature) ? raw.timeSignature as TimeSignature : '4/4'
     const tracks = raw.tracks.map((value, index): Track => {
       const track = value as Partial<Track>
-      const instrument: InstrumentId = ['piano', 'violin', 'cello', 'flute'].includes(track.instrument ?? '') ? track.instrument! : 'piano'
+      const instrument: InstrumentId = INSTRUMENT_IDS.includes(track.instrument!) ? track.instrument! : 'piano'
       const fallback = newTrack(instrument)
       const notes = (Array.isArray(track.notes) ? track.notes : []).filter((note) => Number.isFinite(note.midi) && note.duration > 0)
       return normalizeTrack({ ...fallback, ...track, id: track.id ?? fallback.id, instrument, notes, keySignature: KEY_SIGNATURES.includes(track.keySignature!) ? track.keySignature : key, timeSignature: TIME_SIGNATURES.includes(track.timeSignature!) ? track.timeSignature : meter }, index, key, meter)
